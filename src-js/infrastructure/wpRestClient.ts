@@ -161,10 +161,11 @@ export const wpRestClient = {
 		} );
 	},
 
-	optimizeOnServer( id: number ): Promise< OptimizeResponse > {
+	optimizeOnServer( id: number, retryUpload = false ): Promise< OptimizeResponse > {
 		return apiFetch< OptimizeResponse >( {
 			path: `${ BASE }/optimize-server/${ id }`,
 			method: 'POST',
+			data: retryUpload ? { retry_upload: true } : undefined,
 		} );
 	},
 

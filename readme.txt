@@ -38,7 +38,7 @@ We care about your experience because we are WordPress users too. Kilobyte is de
 * **Browser-first processing + server fallback** uses your browser when possible and WordPress's image editor (Imagick or GD) when needed. Uploads that WordPress handles on its own can queue a copy for background optimization after saving the original.
 * **Non-destructive originals and one-click restore** keep Media Library files in place and serve smaller copies with fallback to the original. Restore a single image or use **Restore all**.
 * **Resize optimized copies** to your maximum width and height. WordPress keeps the uploaded original.
-* **Regenerate thumbnails** to rebuild registered WordPress image sizes and keep existing thumbnail URLs working.
+* **Regenerate thumbnails** to rebuild registered WordPress image sizes. Identical thumbnails reuse the existing files, and previous thumbnail URLs stay available.
 * **Optional auto alt text and image decoding hints** can fill empty alt text from filenames on upload and hint to browsers how to decode photos.
 * **WP-CLI & developer hooks:** Supports `wp kilobyte optimize`, `wp kilobyte restore`, `wp kilobyte stats`, and `wp kilobyte purge-backups`, plus `kilobyte_io_variant_filename` for custom variant naming and `kilobyte_io_variant_changed` for page-cache invalidation.
 
@@ -66,6 +66,10 @@ Kilobyte can fall back to WebP or use your WordPress site's image editor. Format
 
 Kilobyte can process images up to 24 MiB and 40 megapixels. Your host or browser may have lower upload or memory limits. If optimization skips a photo, the results explain why and what to try next.
 
+= What if background optimization is overdue? =
+
+Choose **Optimize now** on the image in the Media Library to process that file directly. If other uploads stay queued, ask your host to check that WordPress scheduled tasks are running.
+
 = Can I optimize GIFs? =
 
 Kilobyte can make WebP or AVIF copies of still GIFs. Animated GIFs keep their animation. Choose Original in the format settings to keep GIF files as they are.
@@ -80,7 +84,7 @@ Restore switches new page requests to the original files. Kilobyte keeps the old
 
 = What happens when I uninstall Kilobyte? =
 
-New pages load the files in your Media Library. Uninstall removes your Kilobyte preferences and pauses scheduled optimization and cleanup. Generated copies and recovery records stay in place, so older cached pages can still use those copies. On a single-site install, use **Restore all** and leave Kilobyte active while WordPress runs scheduled cleanup if you want it to remove eligible copies. If you reinstall Kilobyte, cleanup for restored images resumes as each site loads.
+New pages load the files in your Media Library. Uninstall removes your Kilobyte preferences and pauses scheduled optimization and cleanup. Generated copies and recovery records stay in place, so older cached pages can still use those copies. On a single-site install, use **Restore all** and leave Kilobyte active while WordPress runs scheduled cleanup if you want it to remove eligible copies. Stored cleanup work resumes when you reinstall Kilobyte and WordPress can run its scheduled tasks and verify the file references. Very large libraries keep the files and recheck daily whether cleanup can run safely.
 
 == Development ==
 

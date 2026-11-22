@@ -111,6 +111,9 @@ final class OptimizerCliCommand {
 		WP_CLI::log( sprintf( 'Remaining:        %d', (int) $s['remaining_count'] ) );
 		WP_CLI::log( sprintf( 'Transfer savings: %s (%s%%)', (string) size_format( (int) $s['total_saved'], 1 ), (string) $s['saved_percent'] ) );
 		WP_CLI::log( sprintf( 'Backups:          %d (%s)', (int) $s['backup_count'], (string) size_format( (int) $s['backup_bytes'], 1 ) ) );
+		if ( ! empty( $s['needs_reconcile'] ) ) {
+			WP_CLI::warning( 'The image totals may be out of date. Run wp kilobyte stats --reconcile to rebuild them.' );
+		}
 	}
 
 	/**
@@ -140,10 +143,15 @@ final class OptimizerCliCommand {
 		$before    = 0;
 
 		while ( $processed < $limit ) {
-			$batch   = $this->attachments->get_queue_page( 'optimize', $before, min( 50, $limit - $processed ), false );
-			$items   = is_array( $batch['items'] ) ? $batch['items'] : array();
-			$missing = (int) ( $batch['skipped_missing'] ?? 0 );
+			$batch       = $this->attachments->get_queue_page( 'optimize', $before, min( 50, $limit - $processed ), false );
+			$items       = is_array( $batch['items'] ) ? $batch['items'] : array();
+			$unavailable = is_array( $batch['unavailable_items'] ?? null ) ? $batch['unavailable_items'] : array();
+			$missing     = max( count( $unavailable ), (int) ( $batch['skipped_missing'] ?? 0 ) );
 			if ( $missing > 0 ) {
+				$reason = OperationErrorMessage::to_wp_error( new OperationFailure( OperationFailure::MISSING_SOURCE ) )->get_error_message();
+				foreach ( $unavailable as $item ) {
+					WP_CLI::log( sprintf( '%s. %s', $this->item_label( $item ), $reason ) );
+				}
 				WP_CLI::log( sprintf( 'Skipped %d unavailable files. Check that WordPress can read your media storage.', $missing ) );
 				$processed += $missing;
 			}
@@ -155,7 +163,7 @@ final class OptimizerCliCommand {
 				$result = $this->optimize_server->execute( (int) $item['id'] );
 				if ( $result instanceof OperationFailure ) {
 					++$failed;
-					WP_CLI::warning( sprintf( '#%d %s: %s', (int) $item['id'], (string) $item['filename'], OperationErrorMessage::to_wp_error( $result )->get_error_message() ) );
+					WP_CLI::warning( sprintf( '%s. %s', $this->item_label( $item ), OperationErrorMessage::to_wp_error( $result )->get_error_message() ) );
 				} elseif ( ! empty( $result['skipped'] ) ) {
 					WP_CLI::log( sprintf( '#%d %s: %s', (int) $item['id'], (string) $item['filename'], OperationErrorMessage::describe_skip( (string) ( $result['status'] ?? '' ) ) ) );
 				} else {
@@ -218,7 +226,7 @@ final class OptimizerCliCommand {
 					$res = $this->restore->execute( (int) $item['id'] );
 					if ( $res instanceof OperationFailure ) {
 						++$failed;
-						WP_CLI::warning( sprintf( '#%d: %s', (int) $item['id'], OperationErrorMessage::to_wp_error( $res )->get_error_message() ) );
+						WP_CLI::warning( sprintf( '%s. %s', $this->item_label( $item ), OperationErrorMessage::to_wp_error( $res )->get_error_message() ) );
 					} else {
 						$this->report_restore_details( (int) $item['id'], $res );
 						++$restored;
@@ -245,12 +253,31 @@ final class OptimizerCliCommand {
 
 		$res = $this->restore->execute( $id );
 		if ( $res instanceof OperationFailure ) {
-			WP_CLI::error( OperationErrorMessage::to_wp_error( $res )->get_error_message() );
+			$item = array(
+				'id'       => $id,
+				'filename' => wp_basename( (string) get_attached_file( $id, true ) ),
+				'title'    => get_the_title( $id ),
+			);
+			WP_CLI::error( sprintf( '%s. %s', $this->item_label( $item ), OperationErrorMessage::to_wp_error( $res )->get_error_message() ) );
 			return;
 		}
 
 		WP_CLI::success( sprintf( 'Restored attachment #%d.', $id ) );
 		$this->report_restore_details( $id, $res );
+	}
+
+	/**
+	 * Identify the file on a single terminal line.
+	 *
+	 * @param array<string, mixed> $item Media Library item.
+	 * @return string
+	 */
+	private function item_label( array $item ): string {
+		$name = (string) ( $item['filename'] ?? '' );
+		if ( '' === $name ) {
+			$name = (string) ( $item['title'] ?? '' );
+		}
+		return trim( sprintf( '#%d %s', (int) $item['id'], preg_replace( '/[\x00-\x1F\x7F]/', ' ', $name ) ) );
 	}
 
 	/**

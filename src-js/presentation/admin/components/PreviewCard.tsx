@@ -92,7 +92,7 @@ export function PreviewCard( {
 	};
 	const [ stage, setStage ] = useState< PreviewStage | null >( null );
 	const [ elapsedSec, setElapsedSec ] = useState( 0 );
-	const [ error, setError ] = useState< FriendlyError | null >( null );
+	const [ error, setError ] = useState< ( FriendlyError & { filename: string } ) | null >( null );
 	const [ preview, setPreview ] = useState< PreviewState | null >( null );
 	const [ optimizing, setOptimizing ] = useState( false );
 	const [ optimizedDone, setOptimizedDone ] = useState( false );
@@ -183,7 +183,7 @@ export function PreviewCard( {
 			if ( result.reason === 'animated' ) {
 				source.current = null;
 				setPreview( null );
-				setError( toFriendlyError( 'animated_image' ) );
+				setError( { ...toFriendlyError( 'animated_image' ), filename: src.filename } );
 				return;
 			}
 			if ( result.reason === 'unsupported_mime' ) {
@@ -211,7 +211,7 @@ export function PreviewCard( {
 					source.current = null;
 				}
 				setPreview( src.canUseSite ? { ...original, serverOnly: true } : null );
-				setError( toFriendlyError( error ) );
+				setError( { ...toFriendlyError( error ), filename: src.filename } );
 			}
 		} finally {
 			finishPreview( signal );
@@ -259,7 +259,7 @@ export function PreviewCard( {
 			if ( ! signal.aborted ) {
 				source.current = null;
 				setPreview( canUseSite ? { ...original, serverOnly: true } : null );
-				setError( toFriendlyError( error ) );
+				setError( { ...toFriendlyError( error ), filename } );
 				finishPreview( signal );
 			}
 		}
@@ -439,8 +439,9 @@ export function PreviewCard( {
 
 					{ error && (
 						<Surface variant="secondary">
-							<VStack spacing={ 1 } style={ { padding: 12 } }>
-								<Text size={ 13 } weight={ 600 } isDestructive role="alert">
+							<VStack spacing={ 1 } style={ { padding: 12 } } role="alert">
+								<Text size={ 12 } weight={ 600 }>{ error.filename }</Text>
+								<Text size={ 13 } weight={ 600 } isDestructive>
 									{ error.friendly }
 								</Text>
 								<Text size={ 12 } variant="muted">

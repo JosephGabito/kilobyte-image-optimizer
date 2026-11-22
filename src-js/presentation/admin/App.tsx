@@ -104,11 +104,15 @@ export function App() {
 	useEffect( () => {
 		browserCompressor.detectSupport().then( setSupport );
 		refreshStats();
-		const onRestored = () => {
+		const onMediaChange = () => {
 			refreshStats();
 		};
-		window.addEventListener( 'kilobyte:restored', onRestored );
-		return () => window.removeEventListener( 'kilobyte:restored', onRestored );
+		window.addEventListener( 'kilobyte:restored', onMediaChange );
+		window.addEventListener( 'kilobyte:optimized', onMediaChange );
+		return () => {
+			window.removeEventListener( 'kilobyte:restored', onMediaChange );
+			window.removeEventListener( 'kilobyte:optimized', onMediaChange );
+		};
 	}, [] );
 
 	useEffect( () => {

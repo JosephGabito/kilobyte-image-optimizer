@@ -27,6 +27,7 @@ final class AutomaticUploadOptimization {
 	private const MAX_TRIES      = 3;
 	private const BATCH_SIZE     = 3;
 	private const RECOVERY_CHECK = 'kilobyte_io_auto_recovery_checked';
+	private const OVERDUE_GRACE  = 5 * MINUTE_IN_SECONDS;
 
 	/** @var WpAttachmentRepository */
 	private WpAttachmentRepository $attachments;
@@ -49,6 +50,26 @@ final class AutomaticUploadOptimization {
 	}
 
 	/**
+	 * Finish an upload optimization from its Media Library action.
+	 *
+	 * @param int $id Attachment ID.
+	 * @return array<string, mixed>|OperationFailure
+	 */
+	public function retry_now( int $id ) {
+		$result = $this->attachments->with_attachment_lock(
+			$id,
+			function () use ( $id ) {
+				$result = $this->optimizer->optimize_while_locked( $id );
+				if ( ! $result instanceof OperationFailure ) {
+					$this->finish_success( $id, $result );
+				}
+				return $result;
+			}
+		);
+		return $result ?? new OperationFailure( OperationFailure::BUSY );
+	}
+
+	/**
 	 * Store a job before asking WordPress to run the worker.
 	 *
 	 * @param int  $id     Attachment ID.
@@ -67,10 +88,13 @@ final class AutomaticUploadOptimization {
 					if ( ! $this->settings->load()->is_enabled() ) {
 						return $this->attachments->clear_automatic_job( $id );
 					}
+					if ( ! WpOperationLock::is_current() ) {
+						return false;
+					}
 					$key    = WpAttachmentRepository::AUTO_PENDING;
 					$queued = get_post_meta( $id, $key, true ) || add_post_meta( $id, $key, time() + $delay, true );
 					if ( $queued && self::schedule_worker() ) {
-						if ( $native ) {
+						if ( $native && WpOperationLock::is_current() ) {
 							delete_post_meta( $id, WpAttachmentRepository::NATIVE_PENDING );
 						}
 						return true;
@@ -100,15 +124,16 @@ final class AutomaticUploadOptimization {
 	/**
 	 * Recover pending jobs if WordPress could not persist the next worker.
 	 *
+	 * @param bool $activation Check immediately when enabling the plugin.
 	 * @return void
 	 */
-	public function resume_if_needed(): void {
+	public static function resume_if_needed( bool $activation = false ): void {
 		try {
-			if ( wp_next_scheduled( self::EVENT ) || get_transient( self::RECOVERY_CHECK ) ) {
+			if ( wp_next_scheduled( self::EVENT ) || ( ! $activation && get_transient( self::RECOVERY_CHECK ) ) ) {
 				return;
 			}
 			set_transient( self::RECOVERY_CHECK, true, MINUTE_IN_SECONDS );
-			if ( $this->has_pending() ) {
+			if ( self::has_pending() ) {
 				self::schedule_worker();
 			}
 		} catch ( \Throwable $error ) {
@@ -127,8 +152,9 @@ final class AutomaticUploadOptimization {
 			'automatic_uploads',
 			0,
 			function (): bool {
-				$ids = $this->pending_ids();
-				if ( ! $ids && ! $this->has_pending() ) {
+				$deadline = microtime( true ) + 4;
+				$ids      = $this->pending_ids();
+				if ( ! $ids && ! self::has_pending() ) {
 					return true;
 				}
 				if ( ! self::schedule_worker( MINUTE_IN_SECONDS ) ) {
@@ -137,7 +163,6 @@ final class AutomaticUploadOptimization {
 					}
 					return true;
 				}
-				$deadline = microtime( true ) + 4;
 				foreach ( $ids as $id ) {
 					if ( microtime( true ) >= $deadline ) {
 						break;
@@ -145,8 +170,8 @@ final class AutomaticUploadOptimization {
 					$id = (int) $id;
 					$this->attachments->with_attachment_lock(
 						$id,
-						function () use ( $id ): void {
-							$this->process_upload( $id );
+						function () use ( $id, $deadline ): void {
+							$this->process_upload( $id, $deadline );
 						}
 					);
 				}
@@ -182,7 +207,7 @@ final class AutomaticUploadOptimization {
 	 *
 	 * @return bool
 	 */
-	private function has_pending(): bool {
+	private static function has_pending(): bool {
 		global $wpdb;
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		return null !== $wpdb->get_var(
@@ -193,12 +218,13 @@ final class AutomaticUploadOptimization {
 	/**
 	 * Persist a retry before invoking the editor. The marker survives a fatal timeout.
 	 *
-	 * @param int $id Attachment ID.
+	 * @param int   $id       Attachment ID.
+	 * @param float $deadline Latest time to start an encode in this batch.
 	 * @return void
 	 */
-	private function process_upload( int $id ): void {
+	private function process_upload( int $id, float $deadline ): void {
 		$pending = (int) get_post_meta( $id, WpAttachmentRepository::AUTO_PENDING, true );
-		if ( $pending <= 0 || $pending > time() ) {
+		if ( $pending <= 0 || $pending > time() || microtime( true ) >= $deadline || ! WpOperationLock::is_current() ) {
 			return;
 		}
 		if ( ! $this->settings->load()->is_enabled() || 'attachment' !== get_post_type( $id ) || 'trash' === get_post_status( $id ) ) {
@@ -211,7 +237,11 @@ final class AutomaticUploadOptimization {
 			return;
 		}
 
-		if ( ! update_post_meta( $id, WpAttachmentRepository::AUTO_PENDING, time() + 5 * MINUTE_IN_SECONDS )
+		if ( microtime( true ) >= $deadline ) {
+			return;
+		}
+		if ( ! WpOperationLock::is_current() || ! update_post_meta( $id, WpAttachmentRepository::AUTO_PENDING, time() + 5 * MINUTE_IN_SECONDS )
+			|| ! WpOperationLock::is_current()
 			|| ! update_post_meta( $id, WpAttachmentRepository::AUTO_ATTEMPTS, $tries + 1 )
 		) {
 			$this->store_status( $id, self::FAILURE, OperationFailure::JOB_NOT_QUEUED );
@@ -219,24 +249,47 @@ final class AutomaticUploadOptimization {
 		}
 
 		try {
-			$result = $this->optimizer->optimize_while_locked( $id );
+			$result = $this->optimizer->optimize_while_locked( $id, $deadline );
 		} catch ( \Throwable $error ) {
 			$result = new OperationFailure( OperationFailure::JOB_INTERRUPTED );
 		}
+		if ( ! WpOperationLock::is_current() ) {
+			return;
+		}
 		if ( $result instanceof OperationFailure ) {
+			if ( OperationFailure::JOB_DEFERRED === $result->reason() ) {
+				// The encoder never started. Make this job eligible for the next pass.
+				if ( update_post_meta( $id, WpAttachmentRepository::AUTO_ATTEMPTS, $tries ) && WpOperationLock::is_current() ) {
+					update_post_meta( $id, WpAttachmentRepository::AUTO_PENDING, $pending );
+				}
+				return;
+			}
 			if ( $tries + 1 < self::MAX_TRIES && in_array( $result->reason(), array( OperationFailure::ENCODE_FAILED, OperationFailure::WRITE_FAILED, OperationFailure::SOURCE_CHANGED, OperationFailure::JOB_INTERRUPTED ), true ) ) {
 				return;
 			}
 			$this->finish_failure( $id, $result->reason() );
 			return;
 		}
+		$this->finish_success( $id, $result );
+	}
+
+	/**
+	 * Persist a skip or clear completed upload work while holding the attachment lock.
+	 *
+	 * @param int                  $id     Attachment ID.
+	 * @param array<string, mixed> $result Optimization result.
+	 * @return void
+	 */
+	private function finish_success( int $id, array $result ): void {
 		if ( ! empty( $result['skipped'] ) && ! empty( $result['status'] ) && null === $this->attachments->get_record( $id ) ) {
 			if ( ! $this->store_status( $id, self::SKIP, (string) $result['status'] ) ) {
 				return;
 			}
 		}
-		delete_post_meta( $id, self::FAILURE );
-		$this->attachments->clear_automatic_job( $id );
+		if ( WpOperationLock::is_current() ) {
+			delete_post_meta( $id, self::FAILURE );
+			$this->attachments->clear_automatic_job( $id );
+		}
 	}
 
 	/**
@@ -245,7 +298,7 @@ final class AutomaticUploadOptimization {
 	 * @return void
 	 */
 	private function finish_failure( int $id, string $reason ): void {
-		if ( $this->store_status( $id, self::FAILURE, $reason ) ) {
+		if ( $this->store_status( $id, self::FAILURE, $reason ) && WpOperationLock::is_current() ) {
 			delete_post_meta( $id, self::SKIP );
 			$this->attachments->clear_automatic_job( $id );
 		}
@@ -258,20 +311,23 @@ final class AutomaticUploadOptimization {
 	 * @return bool
 	 */
 	private function store_status( int $id, string $key, string $reason ): bool {
-		$value = array(
+		$value  = array(
 			'reason' => $reason,
 			'stamp'  => $this->attachments->attachment_source_stamp( $id ),
 		);
-		return get_post_meta( $id, $key, true ) === $value || (bool) update_post_meta( $id, $key, $value );
+		$stored = get_post_meta( $id, $key, true );
+		return WpOperationLock::is_current() && ( $stored === $value || (bool) update_post_meta( $id, $key, $value ) );
 	}
 
 	/**
 	 * @param int $id Attachment ID.
-	 * @return array{pending: bool, failure: string, skip: string}
+	 * @return array{pending: bool, stalled: bool, failure: string, skip: string}
 	 */
 	public function status( int $id ): array {
+		$due = (int) get_post_meta( $id, WpAttachmentRepository::AUTO_PENDING, true );
 		return array(
-			'pending' => (bool) get_post_meta( $id, WpAttachmentRepository::AUTO_PENDING, true ),
+			'pending' => $due > 0,
+			'stalled' => $due > 0 && $due <= time() - self::OVERDUE_GRACE,
 			'failure' => $this->read_status( $id, self::FAILURE ),
 			'skip'    => $this->read_status( $id, self::SKIP ),
 		);

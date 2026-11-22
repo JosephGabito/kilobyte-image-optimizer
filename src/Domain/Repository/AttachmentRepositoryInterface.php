@@ -110,6 +110,7 @@ interface AttachmentRepositoryInterface {
 	 * @param string $target_mime     Target MIME type.
 	 * @param string $target_ext      Target extension (webp or avif).
 	 * @param OptimizationSettings $settings Image settings.
+	 * @param float|null           $deadline Time limit for optional thumbnail encodes.
 	 * @return array{variant_path: string, size: int, variants: array<string, string>, widths: array<string, int>, thumbnail_stamps: array<string, string>}|null
 	 */
 	public function save_sibling_variant(
@@ -117,7 +118,8 @@ interface AttachmentRepositoryInterface {
 		string $source_tmp_path,
 		string $target_mime,
 		string $target_ext,
-		OptimizationSettings $settings
+		OptimizationSettings $settings,
+		?float $deadline = null
 	): ?array;
 
 	/**

@@ -241,7 +241,7 @@ export function BulkOptimizerCard( {
 					</HStack>
 
 					<HStack spacing={ 2 } expanded={ false }>
-						{ stats && stats.restorable_count > 0 && (
+						{ stats && ( stats.restorable_count > 0 || stats.needs_reconcile ) && (
 							<Button
 								variant="tertiary"
 								size="compact"

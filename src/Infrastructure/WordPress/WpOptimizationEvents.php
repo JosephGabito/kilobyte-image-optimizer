@@ -33,7 +33,7 @@ final class WpOptimizationEvents implements OptimizationEventsInterface {
 	 */
 	public function optimized( int $attachment_id, OptimizationRecord $record ): void {
 		/** Fires after an optimized copy has been saved. */
-		do_action( 'kilobyte_io_after_optimize', $attachment_id, $record->to_array() );
+		$this->notify( static fn () => do_action( 'kilobyte_io_after_optimize', $attachment_id, $record->to_array() ) );
 		$this->variant_changed( $attachment_id );
 	}
 
@@ -43,6 +43,23 @@ final class WpOptimizationEvents implements OptimizationEventsInterface {
 	 */
 	public function variant_changed( int $attachment_id ): void {
 		/** Fires when pages referencing an attachment may need cache invalidation. */
-		do_action( 'kilobyte_io_variant_changed', $attachment_id );
+		$this->notify( static fn () => do_action( 'kilobyte_io_variant_changed', $attachment_id ) );
+	}
+
+	/**
+	 * Isolate optional callbacks from a completed operation.
+	 * @param callable $action Integration notification.
+	 * @return void
+	 */
+	private function notify( callable $action ): void {
+		global $wp_current_filter;
+		$previous = $wp_current_filter;
+		try {
+			$action();
+		} catch ( \Throwable $error ) {
+			// Core pops the public hook stack only after a callback returns normally.
+			// phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
+			$wp_current_filter = $previous;
+		}
 	}
 }

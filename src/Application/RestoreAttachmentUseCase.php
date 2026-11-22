@@ -85,10 +85,10 @@ final class RestoreAttachmentUseCase {
 					if ( ! $matches && ! $this->retirement->preserve( $attachment_id, $record ) ) {
 						return new OperationFailure( OperationFailure::RESTORE_FAILED );
 					}
+					$retired = $matches && $this->retirement->retire( $attachment_id, $record );
 					if ( ! $this->attachments->delete_record( $attachment_id ) ) {
 						return new OperationFailure( OperationFailure::RESTORE_FAILED );
 					}
-					$retired = $matches && $this->retirement->retire( $attachment_id, $record );
 					$this->events->variant_changed( $attachment_id );
 					return array(
 						'id'            => $attachment_id,

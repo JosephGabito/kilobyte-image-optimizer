@@ -56,6 +56,8 @@ use Kilobyte\ImageOptimizer\Infrastructure\WordPress\WpAttachmentRepository;
 use Kilobyte\ImageOptimizer\Infrastructure\WordPress\WpFilesystemBackupStorage;
 use Kilobyte\ImageOptimizer\Infrastructure\WordPress\WpImageEditorCompressor;
 use Kilobyte\ImageOptimizer\Infrastructure\WordPress\WpOptimizationEvents;
+use Kilobyte\ImageOptimizer\Infrastructure\WordPress\WpRemovedVariantQueue;
+use Kilobyte\ImageOptimizer\Infrastructure\WordPress\WpSiteScope;
 use Kilobyte\ImageOptimizer\Infrastructure\WordPress\WpVariantRetirement;
 use Kilobyte\ImageOptimizer\Presentation\Admin\OptimizerAdminPage;
 use Kilobyte\ImageOptimizer\Presentation\Cli\OptimizerCliCommand;
@@ -101,6 +103,7 @@ function kilobyte_io_bootstrap(): void {
 	$mark_optimal     = new MarkAlreadyOptimalUseCase( $attachment_repo, $events, $save_variant );
 	$purge_backups    = new PurgeBackupsUseCase( $backup_storage, $attachment_repo );
 
+	$automatic_uploads = new AutomaticUploadOptimization( $attachment_repo, $settings_repo, $optimize_server );
 	$rest_controller   = new OptimizerRestController(
 		$attachment_repo,
 		$settings_repo,
@@ -109,13 +112,14 @@ function kilobyte_io_bootstrap(): void {
 		$restore,
 		$regenerate,
 		$mark_optimal,
-		$purge_backups
+		$purge_backups,
+		$automatic_uploads
 	);
-	$automatic_uploads = new AutomaticUploadOptimization( $attachment_repo, $settings_repo, $optimize_server );
 	$media_hooks       = new MediaHooks(
 		$settings_repo,
 		$attachment_repo,
 		$retirement,
+		$events,
 		$automatic_uploads,
 		$alt_policy,
 		$compression_policy,
@@ -141,10 +145,10 @@ function kilobyte_io_bootstrap(): void {
 	$media_hooks->register();
 	$frontend_serve->register();
 	add_action( AutomaticUploadOptimization::EVENT, array( $automatic_uploads, 'process' ) );
-	add_action( 'admin_init', array( $automatic_uploads, 'resume_if_needed' ) );
+	add_action( 'admin_init', array( AutomaticUploadOptimization::class, 'resume_if_needed' ), 10, 0 );
 	add_action( WpVariantRetirement::EVENT, array( $retirement, 'clean_due_files' ) );
-	add_action( WpVariantRetirement::REMOVED_EVENT, array( $retirement, 'clean_removed_files' ), 10, 2 );
-	kilobyte_io_resume_cleanup();
+	add_action( WpRemovedVariantQueue::LEGACY_EVENT, array( WpVariantRetirement::class, 'adopt_legacy_event' ), 10, 4 );
+	add_action( 'admin_init', array( WpVariantRetirement::class, 'resume_if_needed' ), 10, 0 );
 	$admin_page->register();
 	$cli_command->register();
 }
@@ -153,31 +157,43 @@ add_action( 'plugins_loaded', 'kilobyte_io_bootstrap' );
 /**
  * Initialize default settings on plugin activation.
  *
+ * @param bool $network_wide Whether WordPress enabled the plugin for the network.
  * @return void
  */
-function kilobyte_io_activate(): void {
+function kilobyte_io_activate( bool $network_wide = false ): void {
 	( new OptionSettingsRepository() )->ensure_defaults();
-	AutomaticUploadOptimization::schedule_worker();
-	kilobyte_io_resume_cleanup();
+	WpSiteScope::run(
+		static function (): void {
+			AutomaticUploadOptimization::resume_if_needed( true );
+			WpVariantRetirement::resume_if_needed( true );
+		},
+		$network_wide ? get_current_network_id() : null
+	);
 }
 register_activation_hook( __FILE__, 'kilobyte_io_activate' );
 
 /**
- * Resume scheduled cleanup for this site after reinstalling the plugin.
+ * Pause the affected sites' worker events while keeping their stored work.
  *
+ * @param bool $network_wide Whether WordPress disabled the plugin for the network.
  * @return void
  */
-function kilobyte_io_resume_cleanup(): void {
-	$option = 'kilobyte_io_resume_cleanup';
-	if ( ! get_option( $option ) ) {
-		return;
-	}
-
-	$hook = WpVariantRetirement::EVENT;
-	if ( wp_next_scheduled( $hook ) || wp_schedule_event( time() + HOUR_IN_SECONDS, 'hourly', $hook ) ) {
-		delete_option( $option );
-	}
+function kilobyte_io_deactivate( bool $network_wide = false ): void {
+	WpSiteScope::run(
+		static function (): void {
+			try {
+				WpRemovedVariantQueue::retain_legacy_events( null, true );
+				wp_unschedule_hook( WpVariantRetirement::EVENT );
+				wp_unschedule_hook( AutomaticUploadOptimization::EVENT );
+			} catch ( \Throwable $error ) {
+				// A scheduling filter must not prevent WordPress from deactivating the plugin.
+				return;
+			}
+		},
+		$network_wide ? get_current_network_id() : null
+	);
 }
+register_deactivation_hook( __FILE__, 'kilobyte_io_deactivate' );
 
 /**
  * Add direct Optimize images link in the Plugins list.

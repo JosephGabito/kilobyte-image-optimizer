@@ -5,7 +5,7 @@ import { isSupportedMime } from '../../domain/format';
 import type { OptimizeResponse, UploadBootstrapConfig } from '../../domain/types';
 import { browserCompressor } from '../../infrastructure/browserCompressor';
 import { wpRestClient } from '../../infrastructure/wpRestClient';
-import { restoreControls, updateRestoredAttachment } from '../../infrastructure/wpMedia';
+import { restoreControls, retryControls, updateOptimizedAttachment, updateRestoredAttachment } from '../../infrastructure/wpMedia';
 import { restoreDetails } from '../restoreDetails';
 import { optimizationSkip } from '../optimizationSkip';
 
@@ -213,53 +213,73 @@ function installUploadMiddleware( config: UploadBootstrapConfig ): void {
 	} );
 }
 
-function installRestoreButtonHandler(): void {
-	const restoring = new Set< number >();
+function mediaActionError( error: unknown, className: string ): HTMLDivElement {
+	const message = toFriendlyError( error );
+	const feedback = document.createElement( 'div' );
+	feedback.className = className;
+	feedback.setAttribute( 'role', 'status' );
+	feedback.textContent = `${ message.friendly } ${ message.action }`;
+	const details = document.createElement( 'details' );
+	const summary = document.createElement( 'summary' );
+	summary.textContent = __( 'Technical details', 'kilobyte-image-optimizer' );
+	details.append( summary, message.technical );
+	feedback.append( details );
+	return feedback;
+}
+
+function installMediaActionHandler(): void {
+	const working = new Set< number >();
 	document.addEventListener( 'click', async ( event ) => {
 		const target = event.target;
 		if ( ! ( target instanceof Element ) ) {
 			return;
 		}
-		const button = target.closest< HTMLButtonElement >( '.kilobyte-restore-btn' );
+		const button = target.closest< HTMLButtonElement >( '.kilobyte-restore-btn, .kilobyte-optimize-retry-btn' );
 		const id = Number( button?.dataset.id );
-		if ( ! button || button.disabled || ! Number.isSafeInteger( id ) || id <= 0 ) {
+		if ( ! button || button.disabled || ! Number.isSafeInteger( id ) || id <= 0 || working.has( id ) ) {
 			return;
 		}
 
-		button.nextElementSibling?.matches( '.kilobyte-restore-error' ) && button.nextElementSibling.remove();
-		button.disabled = true;
-		button.textContent = __( 'Restoring...', 'kilobyte-image-optimizer' );
-		if ( restoring.has( id ) ) {
-			return;
+		const restore = button.classList.contains( 'kilobyte-restore-btn' );
+		const controls = () => restore ? restoreControls( id ) : retryControls( id );
+		const errorClass = restore ? 'kilobyte-restore-error' : 'kilobyte-retry-error';
+		const restoreLabel = __( 'Restore original', 'kilobyte-image-optimizer' );
+		working.add( id );
+		for ( const control of controls() ) {
+			if ( control.nextElementSibling?.classList.contains( errorClass ) ) {
+				control.nextElementSibling.remove();
+			}
+			control.disabled = true;
+			control.textContent = restore ? __( 'Restoring...', 'kilobyte-image-optimizer' ) : __( 'Optimizing...', 'kilobyte-image-optimizer' );
 		}
-		restoring.add( id );
 
 		try {
-			const result = await wpRestClient.restoreAttachment( id );
-			const details = restoreDetails( result );
-			const message = details
-				? `${ __( 'Original restored.', 'kilobyte-image-optimizer' ) } ${ details }`
-				: __( 'Restored', 'kilobyte-image-optimizer' );
-			updateRestoredAttachment( id, message, true );
-			window.dispatchEvent( new CustomEvent( 'kilobyte:restored', { detail: { id } } ) );
+			if ( restore ) {
+				const result = await wpRestClient.restoreAttachment( id );
+				const details = restoreDetails( result );
+				const message = details
+					? `${ __( 'Original restored.', 'kilobyte-image-optimizer' ) } ${ details }`
+					: __( 'Restored', 'kilobyte-image-optimizer' );
+				updateRestoredAttachment( id, message, true );
+				window.dispatchEvent( new CustomEvent( 'kilobyte:restored', { detail: { id } } ) );
+			} else {
+				const result = await wpRestClient.optimizeOnServer( id, true );
+				const skipped = result.skipped ? optimizationSkip( result.status ) : null;
+				const message = skipped
+					? [ skipped.subtitle, skipped.action ].filter( Boolean ).join( ' ' )
+					: __( 'Optimized copy saved.', 'kilobyte-image-optimizer' );
+				updateOptimizedAttachment( id, message, result.has_backup ? restoreLabel : undefined );
+				window.dispatchEvent( new CustomEvent( 'kilobyte:optimized', { detail: { id } } ) );
+			}
 		} catch ( error ) {
-			const message = toFriendlyError( error );
-			const feedback = document.createElement( 'div' );
-			feedback.className = 'kilobyte-restore-error';
-			feedback.setAttribute( 'role', 'status' );
-			feedback.textContent = `${ message.friendly } ${ message.action }`;
-			const details = document.createElement( 'details' );
-			const summary = document.createElement( 'summary' );
-			summary.textContent = __( 'Technical details', 'kilobyte-image-optimizer' );
-			details.append( summary, message.technical );
-			feedback.append( details );
-			for ( const control of restoreControls( id ) ) {
+			const feedback = mediaActionError( error, errorClass );
+			for ( const control of controls() ) {
 				control.after( feedback.cloneNode( true ) );
 				control.disabled = false;
-				control.textContent = __( 'Restore original', 'kilobyte-image-optimizer' );
+				control.textContent = restore ? restoreLabel : __( 'Optimize now', 'kilobyte-image-optimizer' );
 			}
 		} finally {
-			restoring.delete( id );
+			working.delete( id );
 		}
 	} );
 }
@@ -268,5 +288,5 @@ const config = window.KilobyteIOUploadConfig;
 if ( config ) {
 	browserCompressor.setWorkerUrl( config.workerUrl );
 	installUploadMiddleware( config );
-	installRestoreButtonHandler();
+	installMediaActionHandler();
 }

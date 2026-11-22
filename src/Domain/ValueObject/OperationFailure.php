@@ -38,6 +38,7 @@ final class OperationFailure {
 	public const REGEN_FAILED       = 'regen_failed';
 	public const JOB_NOT_QUEUED     = 'job_not_queued';
 	public const JOB_INTERRUPTED    = 'job_interrupted';
+	public const JOB_DEFERRED       = 'job_deferred';
 
 	/** @var string */
 	private string $reason;

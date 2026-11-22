@@ -12,6 +12,7 @@ namespace Kilobyte\ImageOptimizer\Presentation\Hooks;
 use Kilobyte\ImageOptimizer\Domain\Policy\AltTextPolicy;
 use Kilobyte\ImageOptimizer\Domain\Policy\CompressionPolicy;
 use Kilobyte\ImageOptimizer\Domain\ValueObject\OperationFailure;
+use Kilobyte\ImageOptimizer\Domain\Repository\OptimizationEventsInterface;
 use Kilobyte\ImageOptimizer\Presentation\OperationErrorMessage;
 use Kilobyte\ImageOptimizer\Presentation\Admin\OptimizerAdminPage;
 use Kilobyte\ImageOptimizer\Infrastructure\WordPress\WpAttachmentRepository;
@@ -40,6 +41,9 @@ final class MediaHooks {
 
 	/** @var WpVariantRetirement */
 	private WpVariantRetirement $retirement;
+
+	/** @var OptimizationEventsInterface */
+	private OptimizationEventsInterface $events;
 
 	/** @var array<string, array<string, mixed>> */
 	private array $pending_deletions = array();
@@ -102,6 +106,7 @@ final class MediaHooks {
 	 *
 	 * @param SettingsRepositoryInterface   $settings           Settings repository.
 	 * @param WpVariantRetirement            $retirement         Retired variant storage.
+	 * @param OptimizationEventsInterface   $events             Integration events.
 	 * @param WpAttachmentRepository $attachments        Attachment repository.
 	 * @param AutomaticUploadOptimization   $automatic_uploads Deferred upload work.
 	 * @param AltTextPolicy                 $alt_text_policy    Alt text policy.
@@ -114,6 +119,7 @@ final class MediaHooks {
 		SettingsRepositoryInterface $settings,
 		WpAttachmentRepository $attachments,
 		WpVariantRetirement $retirement,
+		OptimizationEventsInterface $events,
 		AutomaticUploadOptimization $automatic_uploads,
 		AltTextPolicy $alt_text_policy,
 		CompressionPolicy $compression_policy,
@@ -124,6 +130,7 @@ final class MediaHooks {
 		$this->settings           = $settings;
 		$this->attachments        = $attachments;
 		$this->retirement         = $retirement;
+		$this->events             = $events;
 		$this->automatic_uploads  = $automatic_uploads;
 		$this->alt_text_policy    = $alt_text_policy;
 		$this->compression_policy = $compression_policy;
@@ -233,7 +240,7 @@ final class MediaHooks {
 		$id        = $post->ID;
 		$key       = get_current_blog_id() . ':' . $id;
 		$available = null;
-		$release   = $this->attachments->acquire_attachment_lock( $id, $available );
+		$release   = $this->attachments->acquire_attachment_lock( $id, $available, true );
 		if ( null === $release ) {
 			if ( $available ) {
 				return false;
@@ -253,9 +260,19 @@ final class MediaHooks {
 		if ( $paths ) {
 			$paths = array_diff( $paths, array_keys( $this->attachments->attachment_image_paths( $id ) ) );
 		}
+		$paths = array_values( array_unique( array_filter( $paths, array( $this->attachments, 'is_owned_variant_path' ) ) ) );
+		if ( ! WpVariantRetirement::schedule_removed_files( $paths, $id ) ) {
+			$release();
+			return false;
+		}
+		$finish_record = null !== $record ? $this->attachments->prepare_record_deletion( $record ) : null;
+		if ( null !== $record && null === $finish_record ) {
+			$release();
+			return false;
+		}
+
 		$this->pending_deletions[ $key ] = array(
-			'paths'   => array_values( array_unique( array_filter( $paths, array( $this->attachments, 'is_owned_variant_path' ) ) ) ),
-			'record'  => $record,
+			'finish'  => $finish_record,
 			'release' => $release,
 		);
 		return $delete;
@@ -277,15 +294,11 @@ final class MediaHooks {
 
 		unset( $this->pending_deletions[ $key ] );
 		try {
-			$record = $pending['record'];
-			WpVariantRetirement::schedule_removed_files( $pending['paths'] );
-			if ( null !== $record ) {
-				if ( ! $this->attachments->remove_deleted_record( $record ) ) {
-					update_option( WpAttachmentRepository::RECONCILE_OPTION, true, false );
-				}
+			if ( null !== $pending['finish'] ) {
+				$pending['finish']();
 			}
 			clean_post_cache( $post );
-			do_action( 'kilobyte_io_variant_changed', $id );
+			$this->events->variant_changed( $id );
 		} finally {
 			$pending['release']();
 		}
@@ -452,26 +465,32 @@ final class MediaHooks {
 	private function upload_status( int $attachment_id ): string {
 		$status = $this->automatic_uploads->status( $attachment_id );
 		$reason = $status['failure'];
-		if ( '' === $reason ) {
-			if ( $status['pending'] ) {
-				return sprintf(
-					'%s <a href="%s">%s</a>',
-					esc_html__( 'Original saved. Optimization is queued.', 'kilobyte-image-optimizer' ),
-					esc_url( admin_url( 'upload.php?page=' . OptimizerAdminPage::PAGE_SLUG ) ),
-					esc_html__( 'Optimize now in Media', 'kilobyte-image-optimizer' )
-				);
-			}
+		if ( $status['stalled'] ) {
+			$message = __( 'Original saved. Background optimization is overdue. Optimize this image now or ask your host to check scheduled tasks.', 'kilobyte-image-optimizer' );
+		} elseif ( '' !== $reason ) {
+			$error   = OperationErrorMessage::to_wp_error( new OperationFailure( $reason ) );
+			$message = __( 'Original saved.', 'kilobyte-image-optimizer' ) . ' ' . $error->get_error_message();
+		} elseif ( $status['pending'] ) {
+			$message = __( 'Original saved. Optimization is queued.', 'kilobyte-image-optimizer' );
+		} else {
 			return '' !== $status['skip']
 				? esc_html( OperationErrorMessage::describe_skip( $status['skip'] ) )
 				: esc_html__( 'Not optimized', 'kilobyte-image-optimizer' );
 		}
-		$error = OperationErrorMessage::to_wp_error( new OperationFailure( $reason ) );
+
+		$button = '';
+		if ( current_user_can( 'upload_files' ) && current_user_can( 'edit_post', $attachment_id ) ) {
+			$button = sprintf(
+				' <button type="button" class="button-link kilobyte-optimize-retry-btn" data-id="%d">%s</button>',
+				$attachment_id,
+				esc_html__( 'Optimize now', 'kilobyte-image-optimizer' )
+			);
+		}
 		return sprintf(
-			'%s %s <a href="%s">%s</a>',
-			esc_html__( 'Original saved.', 'kilobyte-image-optimizer' ),
-			esc_html( $error->get_error_message() ),
-			esc_url( admin_url( 'upload.php?page=' . OptimizerAdminPage::PAGE_SLUG ) ),
-			esc_html__( 'Open image optimization', 'kilobyte-image-optimizer' )
+			'<div class="kilobyte-upload-status" data-id="%d">%s%s</div>',
+			$attachment_id,
+			esc_html( $message ),
+			$button
 		);
 	}
 
@@ -506,7 +525,7 @@ final class MediaHooks {
 		$record = $this->attachments->get_record( $post_id );
 		if ( null === $record ) {
 			printf(
-				'<span style="color:#646970;">%s</span>',
+				'<div style="color:#646970;">%s</div>',
 				wp_kses_post( $this->upload_status( $post_id ) )
 			);
 			return;

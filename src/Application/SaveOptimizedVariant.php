@@ -54,12 +54,13 @@ final class SaveOptimizedVariant {
 	 * @param string               $mime     Verified output MIME.
 	 * @param OptimizationSettings  $settings Active image settings.
 	 * @param string               $engine   Encoder identifier.
+	 * @param float|null           $deadline Time limit for optional thumbnail encodes.
 	 * @return array<string, mixed>|OperationFailure
 	 */
-	public function execute( array $image, string $path, string $mime, OptimizationSettings $settings, string $engine ) {
+	public function execute( array $image, string $path, string $mime, OptimizationSettings $settings, string $engine, ?float $deadline = null ) {
 		$id      = (int) $image['id'];
 		$ext     = ImageFormat::extension_for_mime( $mime );
-		$variant = null !== $ext ? $this->attachments->save_sibling_variant( $id, $path, $mime, $ext, $settings ) : null;
+		$variant = null !== $ext ? $this->attachments->save_sibling_variant( $id, $path, $mime, $ext, $settings, $deadline ) : null;
 		if ( null === $variant ) {
 			return new OperationFailure( OperationFailure::WRITE_FAILED );
 		}

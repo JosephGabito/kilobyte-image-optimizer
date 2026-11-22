@@ -11,6 +11,12 @@ if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
 	exit;
 }
 
+require_once __DIR__ . '/src/Infrastructure/WordPress/WpRemovedVariantQueue.php';
+require_once __DIR__ . '/src/Infrastructure/WordPress/WpSiteScope.php';
+
+use Kilobyte\ImageOptimizer\Infrastructure\WordPress\WpRemovedVariantQueue;
+use Kilobyte\ImageOptimizer\Infrastructure\WordPress\WpSiteScope;
+
 /**
  * Remove preferences and stop scheduled cleanup while the plugin is absent.
  *
@@ -19,45 +25,21 @@ if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
 function kilobyte_io_uninstall(): void {
 	$clean_site = static function (): void {
 		// Keep the state needed by retained optimization records and their files.
-		$cleanup = 'kilobyte_io_clean_retired_variants';
-		if ( wp_next_scheduled( $cleanup ) ) {
-			update_option( 'kilobyte_io_resume_cleanup', true, true );
+		try {
+			WpRemovedVariantQueue::retain_legacy_events( null, true );
+			wp_unschedule_hook( 'kilobyte_io_clean_retired_variants' );
+			wp_unschedule_hook( 'kilobyte_io_optimize_pending_uploads' );
+		} catch ( \Throwable $error ) {
+			// Stored work can be retried after reinstalling if scheduling is unavailable.
+			return;
+		} finally {
+			delete_option( 'kilobyte_io_resume_cleanup' );
+			delete_option( 'kilobyte_io_settings' );
 		}
-		wp_unschedule_hook( $cleanup );
-		wp_unschedule_hook( 'kilobyte_io_retry_variant_cleanup' );
-		wp_unschedule_hook( 'kilobyte_io_optimize_pending_uploads' );
-		delete_option( 'kilobyte_io_settings' );
 	};
 
-	if ( ! is_multisite() ) {
-		$clean_site();
-		return;
-	}
-
 	// Deleting the plugin removes its files for every site in the installation.
-	$offset = 0;
-	do {
-		$site_ids = get_sites(
-			array(
-				'fields'            => 'ids',
-				'number'            => 100,
-				'offset'            => $offset,
-				'orderby'           => 'id',
-				'order'             => 'ASC',
-				'update_site_cache' => false,
-			)
-		);
-		foreach ( $site_ids as $site_id ) {
-			switch_to_blog( (int) $site_id );
-			try {
-				$clean_site();
-			} finally {
-				restore_current_blog();
-			}
-		}
-		$count   = count( $site_ids );
-		$offset += $count;
-	} while ( 100 === $count );
+	WpSiteScope::run( $clean_site, 0 );
 }
 
 kilobyte_io_uninstall();

@@ -32,6 +32,13 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 	public const NATIVE_PENDING        = '_kilobyte_io_native_pending';
 
 	private const MAX_CLEANUP_REFERENCES = 10000;
+	private const COUNTER_WRITE_PENDING  = 'kilobyte_io_counter_write_pending';
+
+	/** @var array<string, bool> Attachments Core is deleting in this request. */
+	private static array $deleting_images = array();
+
+	/** @var array<int, bool> Sites with a stats write in progress in this request. */
+	private static array $active_stats_writes = array();
 
 	/** @var int Maximum GIF data read for delivery across this request. */
 	private int $gif_delivery_bytes_left = WpRasterImage::MAX_BYTES;
@@ -375,14 +382,32 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 	 *
 	 * @param int $attachment_id Attachment ID.
 	 * @param bool|null $available Whether the database answered the lock request.
+	 * @param bool $for_deletion Whether Core owns the attachment until its deletion finishes.
 	 * @return callable|null
 	 */
-	public function acquire_attachment_lock( int $attachment_id, ?bool &$available = null ): ?callable {
-		$release = WpOperationLock::acquire( 'image:' . $attachment_id, 0, $available );
-		if ( null !== $release ) {
-			wp_cache_delete( $attachment_id, 'post_meta' );
+	public function acquire_attachment_lock( int $attachment_id, ?bool &$available = null, bool $for_deletion = false ): ?callable {
+		$key = get_current_blog_id() . ':' . $attachment_id;
+		if ( isset( self::$deleting_images[ $key ] ) ) {
+			$available = true;
+			return null;
 		}
-		return $release;
+		$release = WpOperationLock::acquire( 'image:' . $attachment_id, 0, $available );
+		if ( null === $release ) {
+			return null;
+		}
+		wp_cache_delete( $attachment_id, 'post_meta' );
+		if ( ! $for_deletion ) {
+			return $release;
+		}
+
+		self::$deleting_images[ $key ] = true;
+		return static function () use ( $release, $key ): void {
+			try {
+				$release();
+			} finally {
+				unset( self::$deleting_images[ $key ] );
+			}
+		};
 	}
 
 	/**
@@ -411,17 +436,20 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 				}
 				$original = $this->load_counters();
 				$stats    = null !== $previous ? $this->subtract_record( $original, $previous ) : $original;
-				if ( ! $this->write_counters( $this->add_record( $stats, $record ) ) ) {
-					return false;
+				$saved    = $this->write_counted_change(
+					$original,
+					$this->add_record( $stats, $record ),
+					'postmeta',
+					static function () use ( $attachment_id, $record ): bool {
+						return false !== update_post_meta( $attachment_id, self::META_KEY, $record->to_array() );
+					}
+				);
+				if ( $saved && WpOperationLock::is_current() ) {
+					delete_post_meta( $attachment_id, '_kilobyte_io_auto_failure' );
+					delete_post_meta( $attachment_id, '_kilobyte_io_auto_skip' );
+					$this->clear_automatic_job( $attachment_id );
 				}
-				if ( false === update_post_meta( $attachment_id, self::META_KEY, $record->to_array() ) ) {
-					$this->write_counters( $original );
-					return false;
-				}
-				delete_post_meta( $attachment_id, '_kilobyte_io_auto_failure' );
-				delete_post_meta( $attachment_id, '_kilobyte_io_auto_skip' );
-				$this->clear_automatic_job( $attachment_id );
-				return true;
+				return $saved;
 			}
 		);
 	}
@@ -443,14 +471,14 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 					return false;
 				}
 				$original = $this->load_counters();
-				if ( ! $this->write_counters( $this->subtract_record( $original, $previous ) ) ) {
-					return false;
-				}
-				if ( ! delete_post_meta( $attachment_id, self::META_KEY ) ) {
-					$this->write_counters( $original );
-					return false;
-				}
-				return true;
+				return $this->write_counted_change(
+					$original,
+					$this->subtract_record( $original, $previous ),
+					'postmeta',
+					static function () use ( $attachment_id ): bool {
+						return delete_post_meta( $attachment_id, self::META_KEY );
+					}
+				);
 			}
 		);
 	}
@@ -463,11 +491,11 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 	 */
 	public function clear_automatic_job( int $attachment_id ): bool {
 		foreach ( array( self::NATIVE_PENDING, self::AUTO_PENDING ) as $key ) {
-			if ( metadata_exists( 'post', $attachment_id, $key ) && ! delete_post_meta( $attachment_id, $key ) ) {
+			if ( metadata_exists( 'post', $attachment_id, $key ) && ( ! WpOperationLock::is_current() || ! delete_post_meta( $attachment_id, $key ) ) ) {
 				return false;
 			}
 		}
-		if ( metadata_exists( 'post', $attachment_id, self::AUTO_ATTEMPTS ) ) {
+		if ( metadata_exists( 'post', $attachment_id, self::AUTO_ATTEMPTS ) && WpOperationLock::is_current() ) {
 			delete_post_meta( $attachment_id, self::AUTO_ATTEMPTS );
 		}
 		return true;
@@ -569,28 +597,22 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 			}
 		}
 
-		if ( ! update_attached_file( $attachment_id, $restored ) ) {
+		global $wpdb;
+		if ( ! WpOperationLock::is_current() || ! WpOperationLock::guard_write( $wpdb->postmeta, static fn () => update_attached_file( $attachment_id, $restored ) ) ) {
 			WpVariantRetirement::schedule_removed_files( $thumbnail_files );
 			return null;
 		}
+		if ( ! WpOperationLock::is_current() ) {
+			WpVariantRetirement::schedule_removed_files( $thumbnail_files );
+			return new OperationFailure( OperationFailure::BUSY );
+		}
 
-		$post_updated = wp_update_post(
-			array(
-				'ID'             => $attachment_id,
-				'post_mime_type' => $target_mime,
-			),
-			true
-		);
-		if ( is_wp_error( $post_updated ) || ! $post_updated || ! wp_update_attachment_metadata( $attachment_id, $metadata ) ) {
-			if ( is_string( $previous_path ) ) {
-				update_attached_file( $attachment_id, $previous_path );
-				if ( get_attached_file( $attachment_id, true ) === $previous_path ) {
-					wp_update_post(
-						array(
-							'ID'             => $attachment_id,
-							'post_mime_type' => $previous_mime,
-						)
-					);
+		$post_updated = $this->set_attachment_mime( $attachment_id, $target_mime );
+		if ( ! $post_updated || ! WpOperationLock::is_current() || ! WpOperationLock::guard_write( $wpdb->postmeta, static fn () => wp_update_attachment_metadata( $attachment_id, $metadata ) ) ) {
+			if ( is_string( $previous_path ) && WpOperationLock::is_current() ) {
+				WpOperationLock::guard_write( $wpdb->postmeta, static fn () => update_attached_file( $attachment_id, $previous_path ) );
+				if ( get_attached_file( $attachment_id, true ) === $previous_path && WpOperationLock::is_current() ) {
+					$this->set_attachment_mime( $attachment_id, $previous_mime );
 				}
 			}
 			// Keep the restored full-size file after WordPress has seen its path.
@@ -606,6 +628,27 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 	}
 
 	/**
+	 * Publish the restored MIME type through WordPress under the attachment lock.
+	 * @param int    $attachment_id Attachment ID.
+	 * @param string $mime          MIME type of the current file.
+	 * @return bool
+	 */
+	private function set_attachment_mime( int $attachment_id, string $mime ): bool {
+		global $wpdb;
+		$result = WpOperationLock::guard_write(
+			$wpdb->posts,
+			static fn () => wp_update_post(
+				array(
+					'ID'             => $attachment_id,
+					'post_mime_type' => $mime,
+				),
+				true
+			)
+		);
+		return ! is_wp_error( $result ) && (bool) $result;
+	}
+
+	/**
 	 * Write a sibling variant and any compatible responsive sizes.
 	 *
 	 * The filename is unique to this record, so other optimizers and earlier outputs keep their files.
@@ -615,6 +658,7 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 	 * @param string $target_mime     Target MIME type.
 	 * @param string $target_ext      Target extension.
 	 * @param OptimizationSettings $settings Image settings.
+	 * @param float|null           $deadline Time limit for optional thumbnail encodes.
 	 * @return array{variant_path: string, size: int, variants: array<string, string>, widths: array<string, int>, thumbnail_stamps: array<string, string>}|null
 	 */
 	public function save_sibling_variant(
@@ -622,7 +666,8 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 		string $source_tmp_path,
 		string $target_mime,
 		string $target_ext,
-		OptimizationSettings $settings
+		OptimizationSettings $settings,
+		?float $deadline = null
 	): ?array {
 		$filesystem = WpLocalFilesystem::get();
 		$original   = $this->resolve_safe_upload_file( get_attached_file( $attachment_id ) );
@@ -646,7 +691,10 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 		$widths           = is_array( $size ) ? array( $relative => (int) $size[0] ) : array();
 		$thumbnail_stamps = array();
 
-		foreach ( $this->thumbnail_paths( $attachment_id, $original ) as $thumbnail ) {
+		foreach ( $this->thumbnail_paths( $attachment_id, $original, $deadline ) as $thumbnail ) {
+			if ( null !== $deadline && microtime( true ) >= $deadline ) {
+				break;
+			}
 			$stamp       = $this->source_stamp( $thumbnail );
 			$source_mime = wp_get_image_mime( $thumbnail );
 			if ( '' === $stamp || ! is_string( $source_mime ) || ! WpRasterImage::is_bounded( $thumbnail, $source_mime ) || WpRasterImage::is_animated( $thumbnail, $source_mime ) ) {
@@ -673,6 +721,9 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 				}
 			}
 			$editor->set_quality( $settings->quality() );
+			if ( null !== $deadline && microtime( true ) >= $deadline ) {
+				break;
+			}
 			$destination = $this->build_variant_path( $thumbnail, $target_ext, $attachment_id, true );
 			if ( $filesystem->exists( $destination ) || is_link( $destination ) ) {
 				continue;
@@ -822,13 +873,14 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 	/**
 	 * Remove recorded file paths under the current site's uploads directory.
 	 *
-	 * @param array<string> $paths Recorded relative paths.
+	 * @param array<string> $paths    Recorded relative paths.
+	 * @param float|null    $deadline End of this cleanup pass.
 	 * @return bool
 	 */
-	public function delete_variant_files( array $paths ): bool {
+	public function delete_variant_files( array $paths, ?float $deadline = null ): bool {
 		// A different site can reference the same storage. Keep its files when we cannot verify ownership.
 		if ( is_multisite() ) {
-			return true;
+			return false;
 		}
 		$filesystem = WpLocalFilesystem::get();
 		$root       = $this->uploads_root();
@@ -836,24 +888,30 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 			return empty( $paths );
 		}
 
-		$removed  = true;
-		$deadline = microtime( true ) + 4;
+		$removed    = true;
+		$deadline ??= microtime( true ) + 4;
 		foreach ( $paths as $relative ) {
 			if ( microtime( true ) >= $deadline ) {
 				return false;
 			}
 			if ( ! $this->is_owned_variant_path( $relative ) ) {
-				$removed = false;
 				continue;
 			}
 			$file = $root . $relative;
 			if ( ! $filesystem->exists( $file ) && ! is_link( $file ) ) {
 				continue;
 			}
-			if ( $this->has_attachment_reference( $relative ) ) {
+			$referenced = $this->has_attachment_reference( $relative );
+			if ( null === $referenced ) {
+				return false;
+			}
+			if ( $referenced ) {
 				continue;
 			}
-			if ( null === $this->resolve_safe_upload_file( $file ) || ! $filesystem->delete( $file ) ) {
+			if ( microtime( true ) >= $deadline || ! WpOperationLock::is_current() ) {
+				return false;
+			}
+			if ( $file !== $this->resolve_safe_upload_file( $file ) || ! $filesystem->delete( $file ) ) {
 				$removed = false;
 			}
 		}
@@ -862,17 +920,15 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 	}
 
 	/**
-	 * An imported copy may now be the WordPress original for another attachment.
-	 *
-	 * @param string $relative Upload-relative file.
-	 * @return bool Whether deletion must be skipped.
+	 * Screen the library using the core meta key index, without loading metadata values.
+	 * @return bool|null Whether the scan fits its budget, or null after a temporary database error.
 	 */
-	private function has_attachment_reference( string $relative ): bool {
+	public function can_check_cleanup_references(): ?bool {
 		global $wpdb;
 		if ( null === $this->cleanup_can_check_references ) {
 			// Count only up to the cleanup budget, using the core meta key index without reading meta values.
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-			$over_budget                        = $wpdb->get_var(
+			$over_budget = $wpdb->get_var(
 				$wpdb->prepare(
 					"SELECT meta_id FROM {$wpdb->postmeta} FORCE INDEX (meta_key) WHERE meta_key IN (%s, %s, %s, %s) LIMIT %d, 1",
 					'_wp_attached_file',
@@ -882,10 +938,23 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 					self::MAX_CLEANUP_REFERENCES
 				)
 			);
-			$this->cleanup_can_check_references = null === $over_budget && '' === $wpdb->last_error;
+			if ( '' !== $wpdb->last_error ) {
+				return null;
+			}
+			$this->cleanup_can_check_references = null === $over_budget;
 		}
-		if ( ! $this->cleanup_can_check_references ) {
-			return true;
+		return $this->cleanup_can_check_references;
+	}
+
+	/**
+	 * An imported copy may now be the WordPress original for another attachment.
+	 * @param string $relative Upload-relative file.
+	 * @return bool|null Whether referenced, or null when the check could not finish safely.
+	 */
+	private function has_attachment_reference( string $relative ): ?bool {
+		global $wpdb;
+		if ( true !== $this->can_check_cleanup_references() ) {
+			return null;
 		}
 		// Only scheduled cleanup checks these indexed meta keys. A basename match deliberately keeps ambiguous files.
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
@@ -899,7 +968,7 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 				'%' . $wpdb->esc_like( wp_basename( $relative ) ) . '%'
 			)
 		);
-		return null !== $reference || '' !== $wpdb->last_error;
+		return '' === $wpdb->last_error ? null !== $reference : null;
 	}
 
 	/**
@@ -968,17 +1037,40 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 	}
 
 	/**
-	 * Subtract the captured record after core deletes the attachment and its post meta.
+	 * Record the pending counter change before Core removes the attachment's metadata.
+	 * Keep the stats lock until Core reaches its post-deletion action.
 	 *
-	 * @param OptimizationRecord $record Removed record.
-	 * @return bool
+	 * @param OptimizationRecord $record Record Core is about to remove.
+	 * @return callable|null Completion callback, or null when deletion should be retried.
 	 */
-	public function remove_deleted_record( OptimizationRecord $record ): bool {
-		return true === $this->with_stats_lock(
-			function () use ( $record ): bool {
-				return $this->write_counters( $this->subtract_record( $this->load_counters(), $record ) );
+	public function prepare_record_deletion( OptimizationRecord $record ): ?callable {
+		$release = $this->acquire_stats_lock( 0 );
+		if ( null === $release ) {
+			return null;
+		}
+		try {
+			$this->refresh_stats_option_cache();
+			$already_pending = $this->mark_counter_write();
+		} catch ( \Throwable $error ) {
+			$already_pending = null;
+		}
+		if ( null === $already_pending ) {
+			$release();
+			return null;
+		}
+		return function () use ( $record, $release, $already_pending ): void {
+			try {
+				$stats = $this->subtract_record( $this->load_counters(), $record );
+				if ( WpOperationLock::is_current() && $this->write_counters( $stats ) ) {
+					$this->clear_counter_write( $already_pending );
+				}
+			} catch ( \Throwable $error ) {
+				// The saved marker lets a later reconcile repair interrupted accounting.
+				return;
+			} finally {
+				$release();
 			}
-		);
+		};
 	}
 
 	/**
@@ -1002,11 +1094,12 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 		if ( ! is_array( $result ) ) {
 			return null;
 		}
+		global $wpdb;
 		$metadata = $result['metadata'];
 		$current  = $this->find_image( $attachment_id, true );
 		if ( ( $current['source_revision'] ?? '' ) !== $image['source_revision'] || $current['file'] !== $image['file']
 			|| wp_get_attachment_metadata( $attachment_id, true ) !== $previous
-			|| ( $previous !== $metadata && ! wp_update_attachment_metadata( $attachment_id, $metadata ) )
+			|| ( $previous !== $metadata && ( ! WpOperationLock::is_current() || ! WpOperationLock::guard_write( $wpdb->postmeta, static fn () => wp_update_attachment_metadata( $attachment_id, $metadata ) ) ) )
 		) {
 			WpVariantRetirement::schedule_removed_files( $result['files'] );
 			return null;
@@ -1077,17 +1170,22 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 					$thumbnail = $this->resolve_safe_upload_file( $staging . $name );
 					$type      = wp_check_filetype( $name );
 					if ( null === $thumbnail || $source === $thumbnail || 0 !== strpos( $thumbnail, $staging )
-						|| ! is_string( $type['ext'] ) || wp_get_image_mime( $thumbnail ) !== $type['type']
+						|| ! is_string( $type['ext'] ) || ! is_string( $type['type'] ) || wp_get_image_mime( $thumbnail ) !== $type['type']
 					) {
 						return null;
 					}
-					$destination = $directory . 'thumbnail.kilobyte-' . $attachment_id . '-' . wp_generate_uuid4() . '.' . $type['ext'];
-					$relative    = substr( $destination, strlen( $root ) );
-					if ( ! $this->is_owned_variant_path( $relative, $attachment_id ) || ! $this->publish_file( $filesystem, $thumbnail, $destination ) ) {
-						return null;
+					$existing = $metadata['sizes'][ $slug ]['file'] ?? '';
+					$reusable = $this->reusable_thumbnail( $existing, $file, $thumbnail, $type['type'] );
+					if ( null === $reusable ) {
+						$destination = $directory . 'thumbnail.kilobyte-' . $attachment_id . '-' . wp_generate_uuid4() . '.' . $type['ext'];
+						$relative    = substr( $destination, strlen( $root ) );
+						if ( ! $this->is_owned_variant_path( $relative, $attachment_id ) || ! $this->publish_file( $filesystem, $thumbnail, $destination ) ) {
+							return null;
+						}
+						$files[]  = $relative;
+						$reusable = wp_basename( $destination );
 					}
-					$files[]            = $relative;
-					$published[ $name ] = wp_basename( $destination );
+					$published[ $name ] = $reusable;
 				}
 				$generated[ $slug ]['file'] = $published[ $name ];
 			}
@@ -1112,6 +1210,29 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 				WpVariantRetirement::schedule_removed_files( $files );
 			}
 		}
+	}
+
+	/**
+	 * Reuse an existing sub-size if the editor produced exactly the same bytes.
+	 *
+	 * @param mixed  $name      Existing sub-size name from WordPress.
+	 * @param string $original  Full image path.
+	 * @param string $generated Newly encoded thumbnail in the work directory.
+	 * @param string $mime      MIME type of the generated thumbnail.
+	 * @return string|null
+	 */
+	private function reusable_thumbnail( $name, string $original, string $generated, string $mime ): ?string {
+		if ( ! is_string( $name ) || '' === $name || wp_basename( $name ) !== $name || validate_file( $name ) ) {
+			return null;
+		}
+		$type  = wp_check_filetype( $name );
+		$path  = trailingslashit( dirname( $original ) ) . $name;
+		$bytes = (int) wp_filesize( $generated );
+		if ( $type['type'] !== $mime || $path === $original || $this->resolve_safe_upload_file( $path ) !== $path || $bytes <= 0 || (int) wp_filesize( $path ) !== $bytes ) {
+			return null;
+		}
+		$hash = $this->source_hash( $generated );
+		return '' !== $hash && $hash === $this->source_hash( $path ) ? $name : null;
 	}
 
 	/**
@@ -1232,14 +1353,14 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 				$stats['restorable_count'] = max( 0, $stats['restorable_count'] - $stats['backup_count'] );
 				$stats['backup_count']     = 0;
 				$stats['backup_bytes']     = 0;
-				if ( ! $this->write_counters( $stats ) ) {
-					return false;
-				}
-				if ( ! get_option( self::BACKUPS_PURGED_OPTION ) && ! update_option( self::BACKUPS_PURGED_OPTION, true, false ) ) {
-					$this->write_counters( $original );
-					return false;
-				}
-				return true;
+				return $this->write_counted_change(
+					$original,
+					$stats,
+					'options',
+					static function (): bool {
+						return (bool) get_option( self::BACKUPS_PURGED_OPTION ) || update_option( self::BACKUPS_PURGED_OPTION, true, false );
+					}
+				);
 			}
 		);
 	}
@@ -1267,10 +1388,17 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 					}
 				} while ( $has_more );
 
-				if ( ! $this->write_counters( $stats ) ) {
+				if ( ! WpOperationLock::is_current() || ! $this->write_counters( $stats ) || ! WpOperationLock::is_current() ) {
 					return null;
 				}
-				delete_option( self::RECONCILE_OPTION );
+				global $wpdb;
+				WpOperationLock::guard_write(
+					$wpdb->options,
+					static function (): void {
+						delete_option( self::COUNTER_WRITE_PENDING );
+						delete_option( self::RECONCILE_OPTION );
+					}
+				);
 				return $this->get_library_stats();
 			}
 		);
@@ -1303,7 +1431,7 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 			'backup_count'     => $counters['backup_count'],
 			'backup_bytes'     => $counters['backup_bytes'],
 			'restorable_count' => $counters['restorable_count'],
-			'needs_reconcile'  => (bool) get_option( self::RECONCILE_OPTION ),
+			'needs_reconcile'  => (bool) get_option( self::RECONCILE_OPTION ) || (bool) get_option( self::COUNTER_WRITE_PENDING ),
 		);
 	}
 
@@ -1390,15 +1518,22 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 	/**
 	 * Read unique existing thumbnail files next to the attachment.
 	 *
-	 * @param int    $attachment_id Attachment ID.
-	 * @param string $original      Main image path.
+	 * @param int        $attachment_id Attachment ID.
+	 * @param string     $original      Main image path.
+	 * @param float|null $deadline      End of the optional encoding pass.
 	 * @return string[]
 	 */
-	private function thumbnail_paths( int $attachment_id, string $original ): array {
+	private function thumbnail_paths( int $attachment_id, string $original, ?float $deadline = null ): array {
+		if ( null !== $deadline && microtime( true ) >= $deadline ) {
+			return array();
+		}
 		$meta  = wp_get_attachment_metadata( $attachment_id, true );
 		$dir   = trailingslashit( dirname( $original ) );
 		$files = array();
 		foreach ( (array) ( $meta['sizes'] ?? array() ) as $data ) {
+			if ( null !== $deadline && microtime( true ) >= $deadline ) {
+				break;
+			}
 			$name = is_array( $data ) ? ( $data['file'] ?? '' ) : '';
 			if ( ! is_string( $name ) || '' === $name || wp_basename( $name ) !== $name || validate_file( $name ) ) {
 				continue;
@@ -1456,16 +1591,102 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 	 * @return mixed
 	 */
 	private function with_stats_lock( callable $operation ) {
-		return WpOperationLock::run(
-			'stats',
-			5,
-			static function () use ( $operation ) {
-				wp_cache_delete( self::STATS_OPTION, 'options' );
-				wp_cache_delete( self::BACKUPS_PURGED_OPTION, 'options' );
-				wp_cache_delete( 'notoptions', 'options' );
-				return $operation();
+		$release = $this->acquire_stats_lock( 5 );
+		if ( null === $release ) {
+			return null;
+		}
+		try {
+			$this->refresh_stats_option_cache();
+			return $operation();
+		} finally {
+			$release();
+		}
+	}
+
+	/**
+	 * WordPress callbacks can reenter on the same DB session. Allow only one stats write per site.
+	 * @param int $wait Seconds to wait for other requests.
+	 * @return callable|null
+	 */
+	private function acquire_stats_lock( int $wait ): ?callable {
+		$site = get_current_blog_id();
+		if ( isset( self::$active_stats_writes[ $site ] ) ) {
+			return null;
+		}
+		$release = WpOperationLock::acquire( 'stats', $wait );
+		if ( null === $release ) {
+			return null;
+		}
+
+		self::$active_stats_writes[ $site ] = true;
+		return static function () use ( $release, $site ): void {
+			try {
+				$release();
+			} finally {
+				unset( self::$active_stats_writes[ $site ] );
 			}
-		);
+		};
+	}
+
+	/**
+	 * Read stats options afresh once their lock is held.
+	 * @return void
+	 */
+	private function refresh_stats_option_cache(): void {
+		wp_cache_delete( self::STATS_OPTION, 'options' );
+		wp_cache_delete( self::BACKUPS_PURGED_OPTION, 'options' );
+		wp_cache_delete( self::COUNTER_WRITE_PENDING, 'options' );
+		wp_cache_delete( 'notoptions', 'options' );
+	}
+
+	/**
+	 * Leave a repair marker if execution stops between writing totals and their source record.
+	 *
+	 * @param array<string, int> $original Previous counters.
+	 * @param array<string, int> $stats    New counters.
+	 * @param string             $table    WordPress table property targeted by the paired write.
+	 * @param callable           $write    Record write to pair with the counter update.
+	 * @return bool
+	 */
+	private function write_counted_change( array $original, array $stats, string $table, callable $write ): bool {
+		global $wpdb;
+		$already_pending = $this->mark_counter_write();
+		if ( null === $already_pending ) {
+			return false;
+		}
+		if ( ! WpOperationLock::is_current() || ! $this->write_counters( $stats ) || ! WpOperationLock::is_current() ) {
+			return false;
+		}
+		$saved = WpOperationLock::guard_write( $wpdb->$table, $write );
+		if ( WpOperationLock::is_current() && ( $saved || $this->write_counters( $original ) ) ) {
+			$this->clear_counter_write( $already_pending );
+		}
+		return $saved;
+	}
+
+	/**
+	 * Persist a repair marker while the stats lock is held.
+	 * @return bool|null Prior marker value, or null when it could not be saved.
+	 */
+	private function mark_counter_write(): ?bool {
+		global $wpdb;
+		$already_pending = (bool) get_option( self::COUNTER_WRITE_PENDING );
+		if ( ! WpOperationLock::is_current() || ( ! $already_pending && ! WpOperationLock::guard_write( $wpdb->options, static fn () => add_option( self::COUNTER_WRITE_PENDING, true, '', false ) ) ) ) {
+			return null;
+		}
+		return $already_pending;
+	}
+
+	/**
+	 * A completed operation can clear its own marker and leave earlier work for reconcile.
+	 * @param bool $already_pending Whether an earlier operation left the marker.
+	 * @return void
+	 */
+	private function clear_counter_write( bool $already_pending ): void {
+		global $wpdb;
+		if ( ! $already_pending && WpOperationLock::is_current() ) {
+			WpOperationLock::guard_write( $wpdb->options, static fn () => delete_option( self::COUNTER_WRITE_PENDING ) );
+		}
 	}
 
 	/**
@@ -1475,7 +1696,8 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 	 * @return bool
 	 */
 	private function write_counters( array $stats ): bool {
-		return $stats === $this->load_counters() || update_option( self::STATS_OPTION, $stats, false );
+		global $wpdb;
+		return $stats === $this->load_counters() || WpOperationLock::guard_write( $wpdb->options, static fn () => update_option( self::STATS_OPTION, $stats, false ) );
 	}
 
 	/**

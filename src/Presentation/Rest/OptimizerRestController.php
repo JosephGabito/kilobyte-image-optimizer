@@ -22,6 +22,7 @@ use Kilobyte\ImageOptimizer\Domain\ValueObject\OptimizationSettings;
 use Kilobyte\ImageOptimizer\Infrastructure\WordPress\WpRasterImage;
 use Kilobyte\ImageOptimizer\Domain\ValueObject\OperationFailure;
 use Kilobyte\ImageOptimizer\Presentation\OperationErrorMessage;
+use Kilobyte\ImageOptimizer\Presentation\Hooks\AutomaticUploadOptimization;
 use WP_Error;
 use WP_REST_Request;
 use WP_REST_Response;
@@ -62,6 +63,9 @@ final class OptimizerRestController {
 	 */
 	private OptimizeOnServerUseCase $optimize_server;
 
+	/** @var AutomaticUploadOptimization */
+	private AutomaticUploadOptimization $automatic_uploads;
+
 	/**
 	 * Restore use case.
 	 *
@@ -101,6 +105,7 @@ final class OptimizerRestController {
 	 * @param RegenerateThumbnailsUseCase   $regenerate       Regenerate thumbnails use case.
 	 * @param MarkAlreadyOptimalUseCase     $mark_optimal     Mark already optimal use case.
 	 * @param PurgeBackupsUseCase           $purge_backups    Purge backups use case.
+	 * @param AutomaticUploadOptimization  $automatic_uploads Upload retry handler.
 	 */
 	public function __construct(
 		AttachmentRepositoryInterface $attachments,
@@ -110,16 +115,18 @@ final class OptimizerRestController {
 		RestoreAttachmentUseCase $restore,
 		RegenerateThumbnailsUseCase $regenerate,
 		MarkAlreadyOptimalUseCase $mark_optimal,
-		PurgeBackupsUseCase $purge_backups
+		PurgeBackupsUseCase $purge_backups,
+		AutomaticUploadOptimization $automatic_uploads
 	) {
-		$this->attachments      = $attachments;
-		$this->settings         = $settings;
-		$this->optimize_browser = $optimize_browser;
-		$this->optimize_server  = $optimize_server;
-		$this->restore          = $restore;
-		$this->regenerate       = $regenerate;
-		$this->mark_optimal     = $mark_optimal;
-		$this->purge_backups    = $purge_backups;
+		$this->attachments       = $attachments;
+		$this->settings          = $settings;
+		$this->optimize_browser  = $optimize_browser;
+		$this->optimize_server   = $optimize_server;
+		$this->restore           = $restore;
+		$this->regenerate        = $regenerate;
+		$this->mark_optimal      = $mark_optimal;
+		$this->purge_backups     = $purge_backups;
+		$this->automatic_uploads = $automatic_uploads;
 	}
 
 	/**
@@ -189,6 +196,12 @@ final class OptimizerRestController {
 				'methods'             => WP_REST_Server::CREATABLE,
 				'callback'            => array( $this, 'optimize_on_server' ),
 				'permission_callback' => array( $this, 'can_edit_attachment' ),
+				'args'                => array(
+					'retry_upload' => array(
+						'type'    => 'boolean',
+						'default' => false,
+					),
+				),
 			)
 		);
 
@@ -374,7 +387,8 @@ final class OptimizerRestController {
 	 * @return WP_REST_Response|WP_Error
 	 */
 	public function optimize_on_server( WP_REST_Request $request ) {
-		$result = $this->optimize_server->execute( absint( $request->get_url_params()['id'] ?? 0 ) );
+		$id     = absint( $request->get_url_params()['id'] ?? 0 );
+		$result = true === $request->get_param( 'retry_upload' ) ? $this->automatic_uploads->retry_now( $id ) : $this->optimize_server->execute( $id );
 		return $result instanceof OperationFailure ? OperationErrorMessage::to_wp_error( $result ) : rest_ensure_response( $result );
 	}
 
