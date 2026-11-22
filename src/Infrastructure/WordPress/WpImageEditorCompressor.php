@@ -13,6 +13,7 @@ use Kilobyte\ImageOptimizer\Domain\Repository\ServerCompressorInterface;
 use Kilobyte\ImageOptimizer\Domain\ValueObject\ImageFormat;
 use Kilobyte\ImageOptimizer\Domain\ValueObject\OptimizationRecord;
 use Kilobyte\ImageOptimizer\Domain\ValueObject\OptimizationSettings;
+use Kilobyte\ImageOptimizer\Domain\ValueObject\OperationFailure;
 
 /**
  * Encodes a bounded, static raster using the WordPress image editor.
@@ -25,15 +26,19 @@ final class WpImageEditorCompressor implements ServerCompressorInterface {
 	 * @param string               $source_file Local source path.
 	 * @param string               $source_mime Source MIME.
 	 * @param OptimizationSettings $settings    Active settings.
-	 * @return array{tmp_path: string, mime: string, size: int}|array{error: string}|array{skip_reason: string}
+	 * @return array{tmp_path: string, mime: string, size: int}|array{error: string, reason?: string}|array{skip_reason: string}
 	 */
 	public function compress_to_temp( string $source_file, string $source_mime, OptimizationSettings $settings ): array {
 		if ( 'image/gif' === $source_mime && ImageFormat::ORIGINAL === $settings->format()->value() ) {
 			return array( 'skip_reason' => OptimizationRecord::STATUS_ORIGINAL_FORMAT_KEPT );
 		}
 
-		if ( ! WpRasterImage::is_bounded( $source_file, $source_mime ) ) {
-			return array( 'error' => __( 'The image is unreadable or exceeds the server image size limit.', 'kilobyte-image-optimizer' ) );
+		$limit_failure = WpRasterImage::limit_failure( $source_file, $source_mime );
+		if ( null !== $limit_failure ) {
+			return array(
+				'error'  => '',
+				'reason' => $limit_failure,
+			);
 		}
 
 		if ( WpRasterImage::is_animated( $source_file, $source_mime ) ) {
@@ -43,7 +48,11 @@ final class WpImageEditorCompressor implements ServerCompressorInterface {
 
 		$editor = wp_get_image_editor( $source_file );
 		if ( is_wp_error( $editor ) ) {
-			return array( 'error' => $editor->get_error_message() );
+			$code = $editor->get_error_code();
+			return array(
+				'error'  => $editor->get_error_message(),
+				'reason' => 'invalid_image' === $code ? OperationFailure::INVALID_IMAGE : OperationFailure::ENCODE_FAILED,
+			);
 		}
 		if ( 'image/gif' === $source_mime && ! WpRasterImage::prepare_still_gif( $source_file, $editor ) ) {
 			return array( 'skip_reason' => 'gif_canvas_kept' );

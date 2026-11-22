@@ -81,15 +81,18 @@ final class OptimizeFromBrowserUseCase {
 					);
 				}
 				$image = $this->attachments->find_image( $attachment_id, true );
-				if ( null === $image || ! $this->policy->is_supported_source_mime( (string) $image['mime_type'] ) ) {
+				if ( null === $image ) {
 					return new OperationFailure( OperationFailure::MISSING_SOURCE );
+				}
+				if ( ! $this->policy->is_supported_source_mime( (string) $image['mime_type'] ) ) {
+					return new OperationFailure( OperationFailure::INVALID_MIME );
 				}
 				if ( '' === $source_hash || ! hash_equals( $image['source_hash'], $source_hash ) ) {
 					return new OperationFailure( OperationFailure::SOURCE_CHANGED );
 				}
 
 				$existing = $this->attachments->get_record( $attachment_id );
-				if ( null !== $existing && ! $existing->is_unchanged() ) {
+				if ( null !== $existing && ! $existing->is_unchanged() && ! $this->attachments->has_changed_sibling_source( $attachment_id, $existing, $image ) ) {
 					return array(
 						'id'      => $attachment_id,
 						'skipped' => true,

@@ -76,6 +76,7 @@ export interface RestoreResponse {
 	mode?: 'sibling' | 'in_place';
 	thumbnails_ready?: boolean;
 	backup_removed?: boolean;
+	copy_retained?: boolean;
 }
 
 export interface OptimizeResponse {

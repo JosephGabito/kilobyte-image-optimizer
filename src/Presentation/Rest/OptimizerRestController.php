@@ -310,53 +310,49 @@ final class OptimizerRestController {
 		$attachment_id = absint( $request->get_url_params()['id'] ?? 0 );
 		$files         = $request->get_file_params();
 		$file          = $files['file'] ?? array();
+		$upload_error  = is_array( $file ) ? ( $file['error'] ?? UPLOAD_ERR_NO_FILE ) : UPLOAD_ERR_NO_FILE;
+		$post_limit    = wp_convert_hr_to_bytes( (string) ini_get( 'post_max_size' ) );
 
-		if (
-			! is_array( $file )
-			|| ! is_string( $file['tmp_name'] ?? null )
-			|| ! is_string( $file['name'] ?? null )
-			|| ! is_uploaded_file( $file['tmp_name'] )
+		// PHP may discard the entire multipart body before WordPress receives it.
+		if ( in_array( $upload_error, array( UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE ), true )
+			|| ( UPLOAD_ERR_NO_FILE === $upload_error && $post_limit > 0 && (int) $request->get_header( 'content-length' ) > $post_limit )
 		) {
-			return new WP_Error(
-				'kilobyte_io_missing_file',
-				__( 'No optimized image file received.', 'kilobyte-image-optimizer' ),
-				array( 'status' => 400 )
-			);
+			return OperationErrorMessage::to_wp_error( new OperationFailure( OperationFailure::UPLOAD_TOO_LARGE ) );
+		}
+		if ( is_int( $upload_error ) && ! in_array( $upload_error, array( UPLOAD_ERR_OK, UPLOAD_ERR_NO_FILE ), true ) ) {
+			return OperationErrorMessage::to_wp_error( new OperationFailure( OperationFailure::UPLOAD_FAILED, 'PHP upload error ' . $upload_error ) );
+		}
+		if ( UPLOAD_ERR_OK !== $upload_error || ! is_string( $file['tmp_name'] ?? null ) || ! is_string( $file['name'] ?? null ) || ! is_uploaded_file( $file['tmp_name'] ) ) {
+			return OperationErrorMessage::to_wp_error( new OperationFailure( OperationFailure::MISSING_FILE ) );
 		}
 
-		$tmp_path     = $file['tmp_name'];
-		$upload_error = $file['error'] ?? UPLOAD_ERR_NO_FILE;
-		if ( UPLOAD_ERR_OK !== $upload_error ) {
-			return new WP_Error(
-				'kilobyte_io_upload_error',
-				__( 'Image upload did not complete cleanly.', 'kilobyte-image-optimizer' ),
-				array( 'status' => 400 )
-			);
-		}
-
+		$tmp_path      = $file['tmp_name'];
 		$uploaded_name = sanitize_file_name( $file['name'] );
+		$declared      = wp_check_filetype( $uploaded_name );
+		if ( ImageFormat::is_allowed_output_mime( (string) $declared['type'] ) && ! wp_get_image_mime( $tmp_path ) ) {
+			return OperationErrorMessage::to_wp_error( new OperationFailure( OperationFailure::INVALID_IMAGE ) );
+		}
 		$checked       = wp_check_filetype_and_ext( $tmp_path, $uploaded_name );
 		$detected_mime = ! empty( $checked['type'] ) ? (string) $checked['type'] : '';
 
 		// Enforce WordPress allowed upload MIME policy (no raw mime_content_type bypass).
 		if ( '' === $detected_mime || ! ImageFormat::is_allowed_output_mime( $detected_mime ) ) {
-			return new WP_Error(
-				'kilobyte_io_invalid_mime',
-				__( 'Uploaded file is not an allowed image format on this site.', 'kilobyte-image-optimizer' ),
-				array( 'status' => 400 )
-			);
+			return OperationErrorMessage::to_wp_error( new OperationFailure( OperationFailure::INVALID_MIME ) );
 		}
 
-		if ( ! WpRasterImage::is_bounded( $tmp_path, $detected_mime, true )
-			|| WpRasterImage::is_animated( $tmp_path, $detected_mime )
-			|| is_wp_error( wp_get_image_editor( $tmp_path, array( 'mime_type' => $detected_mime ) ) )
-		) {
-			return new WP_Error(
-				'kilobyte_io_invalid_image',
-				__( 'This image is damaged or too large for the server to process.', 'kilobyte-image-optimizer' ),
-				array( 'status' => 422 )
-			);
+		$limit_failure = WpRasterImage::limit_failure( $tmp_path, $detected_mime, true );
+		if ( null !== $limit_failure ) {
+			return OperationErrorMessage::to_wp_error( new OperationFailure( $limit_failure ) );
 		}
+		if ( WpRasterImage::is_animated( $tmp_path, $detected_mime ) ) {
+			return OperationErrorMessage::to_wp_error( new OperationFailure( OperationFailure::ANIMATED_IMAGE ) );
+		}
+		$editor = wp_get_image_editor( $tmp_path, array( 'mime_type' => $detected_mime ) );
+		if ( is_wp_error( $editor ) ) {
+			$reason = 'image_no_editor' === $editor->get_error_code() ? OperationFailure::INVALID_MIME : OperationFailure::INVALID_IMAGE;
+			return OperationErrorMessage::to_wp_error( new OperationFailure( $reason, $editor->get_error_message() ) );
+		}
+		unset( $editor );
 
 		$params = $request->get_body_params();
 		$result = $this->optimize_browser->execute(

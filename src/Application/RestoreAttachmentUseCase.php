@@ -77,19 +77,24 @@ final class RestoreAttachmentUseCase {
 				}
 
 				if ( $record->is_sibling() ) {
-					$readable = $this->attachments->has_readable_original( $attachment_id );
+					$matches  = $this->attachments->has_verified_original( $attachment_id, $record );
+					$readable = $matches || $this->attachments->has_readable_original( $attachment_id );
 					if ( ! $readable && ! $this->attachments->has_animated_gif_original( $attachment_id ) ) {
 						return new OperationFailure( OperationFailure::ORIGINAL_MISSING );
 					}
-					// A structurally complete animation can be re-enabled without retiring a usable copy.
-					if ( ( $readable && ! $this->retirement->retire( $attachment_id, $record ) ) || ! $this->attachments->delete_record( $attachment_id ) ) {
+					if ( ! $matches && ! $this->retirement->preserve( $attachment_id, $record ) ) {
 						return new OperationFailure( OperationFailure::RESTORE_FAILED );
 					}
+					if ( ! $this->attachments->delete_record( $attachment_id ) ) {
+						return new OperationFailure( OperationFailure::RESTORE_FAILED );
+					}
+					$retired = $matches && $this->retirement->retire( $attachment_id, $record );
 					$this->events->variant_changed( $attachment_id );
 					return array(
-						'id'       => $attachment_id,
-						'restored' => true,
-						'mode'     => 'sibling',
+						'id'            => $attachment_id,
+						'restored'      => true,
+						'mode'          => 'sibling',
+						'copy_retained' => ! $retired,
 					);
 				}
 
@@ -117,7 +122,12 @@ final class RestoreAttachmentUseCase {
 			return new OperationFailure( OperationFailure::MISSING_BACKUP );
 		}
 
-		$restored = $this->attachments->restore_file( $attachment_id, $backup );
+		$backup_bytes   = $record->backup_bytes();
+		$expected_bytes = $backup_bytes > 0 ? $backup_bytes : $record->original_size();
+		$restored       = $this->attachments->restore_file( $attachment_id, $backup, $expected_bytes );
+		if ( $restored instanceof OperationFailure ) {
+			return $restored;
+		}
 		if ( null === $restored ) {
 			return new OperationFailure( OperationFailure::RESTORE_FAILED );
 		}

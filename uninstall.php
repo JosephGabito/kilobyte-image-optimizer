@@ -25,6 +25,7 @@ function kilobyte_io_uninstall(): void {
 		}
 		wp_unschedule_hook( $cleanup );
 		wp_unschedule_hook( 'kilobyte_io_retry_variant_cleanup' );
+		wp_unschedule_hook( 'kilobyte_io_optimize_pending_uploads' );
 		delete_option( 'kilobyte_io_settings' );
 	};
 

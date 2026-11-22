@@ -11,6 +11,7 @@ namespace Kilobyte\ImageOptimizer\Domain\Repository;
 
 use Kilobyte\ImageOptimizer\Domain\ValueObject\OptimizationRecord;
 use Kilobyte\ImageOptimizer\Domain\ValueObject\OptimizationSettings;
+use Kilobyte\ImageOptimizer\Domain\ValueObject\OperationFailure;
 
 /**
  * Attachment repository contract.
@@ -42,6 +43,15 @@ interface AttachmentRepositoryInterface {
 	public function has_readable_original( int $attachment_id ): bool;
 
 	/**
+	 * Verify the current original against the fingerprint saved with its copy.
+	 *
+	 * @param int                $attachment_id Attachment ID.
+	 * @param OptimizationRecord $record        Stored optimization.
+	 * @return bool
+	 */
+	public function has_verified_original( int $attachment_id, OptimizationRecord $record ): bool;
+
+	/**
 	 * @param int $attachment_id Attachment ID.
 	 * @return bool Whether the attachment is a structurally complete animated GIF.
 	 */
@@ -54,6 +64,16 @@ interface AttachmentRepositoryInterface {
 	 * @return OptimizationRecord|null
 	 */
 	public function get_record( int $attachment_id ): ?OptimizationRecord;
+
+	/**
+	 * Check whether a sibling copy describes an older version of the current source.
+	 *
+	 * @param int                       $attachment_id Attachment ID.
+	 * @param OptimizationRecord        $record        Existing optimization.
+	 * @param array<string, mixed>|null  $image         Source already read by an encoder, if available.
+	 * @return bool
+	 */
+	public function has_changed_sibling_source( int $attachment_id, OptimizationRecord $record, ?array $image = null ): bool;
 
 	/**
 	 * Persist an attachment's optimization record and update aggregate counters.
@@ -77,9 +97,10 @@ interface AttachmentRepositoryInterface {
 	 *
 	 * @param int    $attachment_id Attachment ID.
 	 * @param string $source_tmp_path Validated backup path.
-	 * @return array{dest_file: string, size: int, thumbnails_ready: bool}|null
+	 * @param int    $expected_bytes  Recorded original size, if available.
+	 * @return array{dest_file: string, size: int, thumbnails_ready: bool}|OperationFailure|null
 	 */
-	public function restore_file( int $attachment_id, string $source_tmp_path ): ?array;
+	public function restore_file( int $attachment_id, string $source_tmp_path, int $expected_bytes );
 
 	/**
 	 * Write an optimized copy beside the original file.
@@ -100,13 +121,13 @@ interface AttachmentRepositoryInterface {
 	): ?array;
 
 	/**
-	 * Remove only the images owned by a variant record.
+	 * Queue cleanup of files created during an unsuccessful save.
 	 *
 	 * @param int                $attachment_id Attachment ID.
 	 * @param OptimizationRecord $record        Variant owner.
-	 * @return bool
+	 * @return void
 	 */
-	public function delete_sibling_variant( int $attachment_id, OptimizationRecord $record ): bool;
+	public function discard_sibling_variant( int $attachment_id, OptimizationRecord $record ): void;
 
 	/**
 	 * Run an operation under the attachment lock, or return null if busy.

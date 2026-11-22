@@ -78,14 +78,17 @@ final class MarkAlreadyOptimalUseCase {
 			);
 		}
 		$image = $this->attachments->find_image( $attachment_id, true );
-		if ( null === $image || ! in_array( $image['mime_type'], CompressionPolicy::SUPPORTED_SOURCE_MIMES, true ) ) {
+		if ( null === $image ) {
 			return new OperationFailure( OperationFailure::MISSING_SOURCE );
+		}
+		if ( ! in_array( $image['mime_type'], CompressionPolicy::SUPPORTED_SOURCE_MIMES, true ) ) {
+			return new OperationFailure( OperationFailure::INVALID_MIME );
 		}
 		if ( '' === $source_hash || ! hash_equals( $image['source_hash'], $source_hash ) ) {
 			return new OperationFailure( OperationFailure::SOURCE_CHANGED );
 		}
 		$record = $this->attachments->get_record( $attachment_id );
-		if ( null !== $record && ! $record->is_unchanged() ) {
+		if ( null !== $record && ! $record->is_unchanged() && ! $this->attachments->has_changed_sibling_source( $attachment_id, $record, $image ) ) {
 			return array(
 				'id'     => $attachment_id,
 				'status' => 'preserved_existing',

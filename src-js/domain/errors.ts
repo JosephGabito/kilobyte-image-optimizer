@@ -2,6 +2,9 @@ export type ErrorCode =
 	| 'invalid_json_response'
 	| 'permission_denied'
 	| 'file_too_large'
+	| 'server_image_limit'
+	| 'image_unreadable'
+	| 'upload_failed'
 	| 'not_found'
 	| 'timeout'
 	| 'network_error'
@@ -10,6 +13,7 @@ export type ErrorCode =
 	| 'clipboard_failed'
 	| 'original_missing'
 	| 'backup_missing'
+	| 'backup_unverified'
 	| 'no_backup'
 	| 'encode_failed'
 	| 'source_changed'
@@ -26,6 +30,27 @@ export interface FriendlyError {
 	friendly: string;
 	action: string;
 	technical: string;
+}
+
+type RestError = { code?: string; data?: { status?: number } };
+
+export class OptimizationFallbackError extends Error {
+	constructor( readonly browserError: unknown, readonly serverError: unknown ) {
+		super( 'Browser copy and server fallback failed' );
+	}
+}
+
+export function canUseServerAfterBrowserSave( err: unknown ): boolean {
+	const { code, data } = ( err ?? {} ) as RestError;
+	return data?.status === 413 || ( ! code && ( data?.status === 415 || data?.status === 422 ) ) || [
+		'kilobyte_io_invalid_mime',
+		'kilobyte_io_invalid_image',
+		'kilobyte_io_animated_image',
+		'kilobyte_io_image_too_large',
+		'kilobyte_io_upload_too_large',
+		'kilobyte_io_server_image_limit',
+		'kilobyte_io_source_changed',
+	].includes( code ?? '' );
 }
 
 function extractTechnicalMessage( err: unknown ): string {
@@ -51,8 +76,75 @@ function extractTechnicalMessage( err: unknown ): string {
 }
 
 export function toFriendlyError( err: unknown ): FriendlyError {
+	if ( err instanceof OptimizationFallbackError ) {
+		const browser = toFriendlyError( err.browserError );
+		const server = toFriendlyError( err.serverError );
+		return {
+			...server,
+			friendly: browser.friendly === server.friendly ? server.friendly : `${ browser.friendly } ${ server.friendly }`,
+			technical: `${ browser.technical }\n${ server.technical }`,
+		};
+	}
+
 	const technical = extractTechnicalMessage( err );
 	const lower = technical.toLowerCase();
+	const { code, data } = ( err ?? {} ) as RestError;
+
+	if ( code === 'kilobyte_io_upload_too_large' || data?.status === 413 || /\bhttp 413\b/.test( lower )
+		|| lower.includes( 'payload too large' ) || lower.includes( 'entity too large' )
+	) {
+		return {
+			code: 'file_too_large',
+			friendly: 'The optimized copy exceeds your site’s upload limit.',
+			action: 'Set smaller maximum dimensions in Preference or use Optimize with site settings.',
+			technical,
+		};
+	}
+
+	if ( code === 'kilobyte_io_image_too_large' || lower.includes( 'image_too_large' ) ) {
+		return {
+			code: 'file_too_large',
+			friendly: 'This photo exceeds the image processing limit.',
+			action: 'Resize the photo in an image editor and try again with the smaller file.',
+			technical,
+		};
+	}
+
+	if ( code === 'kilobyte_io_server_image_limit' ) {
+		return {
+			code: 'server_image_limit',
+			friendly: 'Your server has too little memory to process this photo.',
+			action: 'Try a smaller version of the photo or ask your host to check the PHP memory limit.',
+			technical,
+		};
+	}
+
+	if ( code === 'kilobyte_io_invalid_image' || ( ! code && data?.status === 422 ) ) {
+		return {
+			code: 'image_unreadable',
+			friendly: 'WordPress could not read this image.',
+			action: 'Check that the original opens. Try the site settings or re-save the photo as JPEG or PNG.',
+			technical,
+		};
+	}
+
+	if ( code === 'kilobyte_io_invalid_mime' || ( ! code && data?.status === 415 ) ) {
+		return {
+			code: 'unsupported_format',
+			friendly: 'Your site cannot process this image format.',
+			action: 'Try a different format in Preview or re-save the original as JPEG or PNG.',
+			technical,
+		};
+	}
+
+	if ( code === 'kilobyte_io_missing_file' || code === 'kilobyte_io_upload_error' ) {
+		return {
+			code: 'upload_failed',
+			friendly: 'WordPress did not receive the complete optimized copy.',
+			action: 'Try saving the copy again. If it keeps failing, ask your host to check uploads.',
+			technical,
+		};
+	}
 
 	if ( lower.includes( 'kilobyte_io_settings_save_failed' ) ) {
 		return {
@@ -84,6 +176,14 @@ export function toFriendlyError( err: unknown ): FriendlyError {
 			technical,
 		};
 	}
+	if ( code === 'kilobyte_io_backup_unverified' ) {
+		return {
+			code: 'backup_unverified',
+			friendly: 'WordPress could not verify the saved backup. The current image was kept.',
+			action: 'Recover an intact backup or ask your host to check the image processing limit, then retry.',
+			technical,
+		};
+	}
 	if ( lower.includes( 'kilobyte_io_no_backup' ) ) {
 		return {
 			code: 'no_backup',
@@ -92,22 +192,6 @@ export function toFriendlyError( err: unknown ): FriendlyError {
 			technical,
 		};
 	}
-	if (
-		lower.includes( 'image size limit' ) ||
-		lower.includes( 'image_too_large' ) ||
-		lower.includes( 'too large' ) ||
-		lower.includes( '413' ) ||
-		lower.includes( 'payload too large' ) ||
-		lower.includes( 'entity too large' )
-	) {
-		return {
-			code: 'file_too_large',
-			friendly: 'This photo is too large to process.',
-			action: 'Try a smaller copy of the photo.',
-			technical,
-		};
-	}
-
 	if (
 		lower.includes( '401' ) ||
 		lower.includes( '403' ) ||
@@ -132,7 +216,7 @@ export function toFriendlyError( err: unknown ): FriendlyError {
 	) {
 		return {
 			code: 'not_found',
-			friendly: 'This image file could not be found on your server.',
+			friendly: 'WordPress could not open this file from the Media Library.',
 			action: 'Check your media storage or recover the file from a site backup, then retry.',
 			technical,
 		};

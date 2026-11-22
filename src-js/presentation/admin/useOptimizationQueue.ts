@@ -1,4 +1,4 @@
-import { useRef, useState } from '@wordpress/element';
+import { useMemo, useRef, useState } from '@wordpress/element';
 import { __, sprintf } from '@wordpress/i18n';
 import { optimizeQueueItem } from '../../application/optimizeQueueItem';
 import { runBulkQueue } from '../../application/runBulkQueue';
@@ -33,12 +33,14 @@ export function useOptimizationQueue( {
 	const [ lastSummary, setLastSummary ] = useState< RunSummary | null >( null );
 	const [ stopping, setStopping ] = useState( false );
 	const [ progress, setProgress ] = useState< BulkProgress | null >( null );
-	const [ logs, setLogs ] = useState< LogEntry[] >( [] );
+	const [ recentLogs, setRecentLogs ] = useState< LogEntry[] >( [] );
+	const [ keptLogs, setKeptLogs ] = useState< LogEntry[] >( [] );
+	const logs = useMemo( () => [ ...keptLogs, ...recentLogs ], [ keptLogs, recentLogs ] );
 	const stopRef = useRef( false );
 	const scan = useRef< AbortController | null >( null );
 
 	const pushLog = ( entry: Omit< LogEntry, 'id' > ) => {
-		setLogs( ( prev ) => [
+		setRecentLogs( ( prev ) => [
 			{
 				id: `${ Date.now() }-${ Math.random() }`,
 				...entry,
@@ -81,7 +83,8 @@ export function useOptimizationQueue( {
 		setLastSummary( null );
 		setRetryItems( [] );
 		setNextPage( null );
-		setLogs( [] );
+		setRecentLogs( [] );
+		setKeptLogs( [] );
 
 		const startedAt = Date.now();
 		const scanning = __( 'Finding images in your Media Library...', 'kilobyte-image-optimizer' );
@@ -155,14 +158,16 @@ export function useOptimizationQueue( {
 					onError: ( item, error ) => {
 						failed.push( item );
 						const parsed = toFriendlyError( error );
-						pushLog( {
+						const entry: LogEntry = {
+							id: `failed-${ item.id }`,
 							title: item.filename,
 							subtitle: parsed.friendly,
 							metric: __( 'Failed', 'kilobyte-image-optimizer' ),
 							tone: 'error',
 							action: parsed.action,
 							technical: parsed.technical,
-						} );
+						};
+						setKeptLogs( ( rows ) => [ entry, ...rows ] );
 					},
 					processItem: async ( item ) => {
 						pendingRetry.delete( item.id );
@@ -245,16 +250,16 @@ export function useOptimizationQueue( {
 			if ( missing > 0 ) {
 				const metric = __( 'Skipped', 'kilobyte-image-optimizer' );
 				const missingLogs: LogEntry[] = unavailable.map( ( item ) => ( {
-					id: `unavailable-${ item.id }`,
-					title: item.filename || item.title || sprintf(
-						/* translators: %d: Media Library attachment ID. */
-						__( 'Media item #%d', 'kilobyte-image-optimizer' ),
-						item.id
-					),
-					editUrl: item.edit_url,
-					...optimizationSkip( 'unavailable' ),
-					metric,
-					tone: 'muted',
+						id: `unavailable-${ item.id }`,
+						title: item.filename || item.title || sprintf(
+							/* translators: %d: Media Library attachment ID. */
+							__( 'Media item #%d', 'kilobyte-image-optimizer' ),
+							item.id
+						),
+						editUrl: item.edit_url,
+						...optimizationSkip( 'unavailable' ),
+						metric,
+						tone: 'muted',
 				} ) );
 				const unlisted = missing - unavailable.length;
 				if ( unlisted > 0 ) {
@@ -268,8 +273,7 @@ export function useOptimizationQueue( {
 						tone: 'muted',
 					} );
 				}
-				// Keep these names available after the rolling activity list fills.
-				setLogs( ( recent ) => [ ...missingLogs, ...recent ] );
+				setKeptLogs( ( rows ) => [ ...rows, ...missingLogs ] );
 			}
 			scan.current = null;
 			setRetryItems( [ ...failed, ...pendingRetry.values() ] );
@@ -285,7 +289,8 @@ export function useOptimizationQueue( {
 	const clearResults = () => {
 		setRetryItems( [] );
 		setNextPage( null );
-		setLogs( [] );
+		setRecentLogs( [] );
+		setKeptLogs( [] );
 		setLastSummary( null );
 		setPhase( 'idle' );
 	};

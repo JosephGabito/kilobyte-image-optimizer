@@ -59,6 +59,7 @@ use Kilobyte\ImageOptimizer\Infrastructure\WordPress\WpOptimizationEvents;
 use Kilobyte\ImageOptimizer\Infrastructure\WordPress\WpVariantRetirement;
 use Kilobyte\ImageOptimizer\Presentation\Admin\OptimizerAdminPage;
 use Kilobyte\ImageOptimizer\Presentation\Cli\OptimizerCliCommand;
+use Kilobyte\ImageOptimizer\Presentation\Hooks\AutomaticUploadOptimization;
 use Kilobyte\ImageOptimizer\Presentation\Hooks\FrontendImageDelivery;
 use Kilobyte\ImageOptimizer\Presentation\Hooks\MediaHooks;
 use Kilobyte\ImageOptimizer\Presentation\Rest\OptimizerRestController;
@@ -78,7 +79,8 @@ function kilobyte_io_bootstrap(): void {
 	$compression_policy = new CompressionPolicy();
 
 	$events           = new WpOptimizationEvents();
-	$save_variant     = new SaveOptimizedVariant( $attachment_repo, $events );
+	$retirement       = new WpVariantRetirement( $attachment_repo );
+	$save_variant     = new SaveOptimizedVariant( $attachment_repo, $events, $retirement );
 	$optimize_browser = new OptimizeFromBrowserUseCase(
 		$attachment_repo,
 		$events,
@@ -94,13 +96,12 @@ function kilobyte_io_bootstrap(): void {
 		$compression_policy,
 		$save_variant
 	);
-	$retirement       = new WpVariantRetirement( $attachment_repo );
 	$restore          = new RestoreAttachmentUseCase( $attachment_repo, $events, $backup_storage, $retirement );
 	$regenerate       = new RegenerateThumbnailsUseCase( $attachment_repo );
 	$mark_optimal     = new MarkAlreadyOptimalUseCase( $attachment_repo, $events, $save_variant );
 	$purge_backups    = new PurgeBackupsUseCase( $backup_storage, $attachment_repo );
 
-	$rest_controller = new OptimizerRestController(
+	$rest_controller   = new OptimizerRestController(
 		$attachment_repo,
 		$settings_repo,
 		$optimize_browser,
@@ -110,25 +111,26 @@ function kilobyte_io_bootstrap(): void {
 		$mark_optimal,
 		$purge_backups
 	);
-	$media_hooks     = new MediaHooks(
+	$automatic_uploads = new AutomaticUploadOptimization( $attachment_repo, $settings_repo, $optimize_server );
+	$media_hooks       = new MediaHooks(
 		$settings_repo,
 		$attachment_repo,
 		$retirement,
-		$optimize_server,
+		$automatic_uploads,
 		$alt_policy,
 		$compression_policy,
 		KILOBYTE_IO_URL,
 		KILOBYTE_IO_DIR,
 		KILOBYTE_IO_VERSION
 	);
-	$frontend_serve  = new FrontendImageDelivery( $attachment_repo );
-	$admin_page      = new OptimizerAdminPage(
+	$frontend_serve    = new FrontendImageDelivery( $attachment_repo );
+	$admin_page        = new OptimizerAdminPage(
 		$settings_repo,
 		KILOBYTE_IO_URL,
 		KILOBYTE_IO_DIR,
 		KILOBYTE_IO_VERSION
 	);
-	$cli_command     = new OptimizerCliCommand(
+	$cli_command       = new OptimizerCliCommand(
 		$attachment_repo,
 		$optimize_server,
 		$restore,
@@ -138,7 +140,10 @@ function kilobyte_io_bootstrap(): void {
 	$rest_controller->register();
 	$media_hooks->register();
 	$frontend_serve->register();
+	add_action( AutomaticUploadOptimization::EVENT, array( $automatic_uploads, 'process' ) );
+	add_action( 'admin_init', array( $automatic_uploads, 'resume_if_needed' ) );
 	add_action( WpVariantRetirement::EVENT, array( $retirement, 'clean_due_files' ) );
+	add_action( WpVariantRetirement::REMOVED_EVENT, array( $retirement, 'clean_removed_files' ), 10, 2 );
 	kilobyte_io_resume_cleanup();
 	$admin_page->register();
 	$cli_command->register();
@@ -152,6 +157,7 @@ add_action( 'plugins_loaded', 'kilobyte_io_bootstrap' );
  */
 function kilobyte_io_activate(): void {
 	( new OptionSettingsRepository() )->ensure_defaults();
+	AutomaticUploadOptimization::schedule_worker();
 	kilobyte_io_resume_cleanup();
 }
 register_activation_hook( __FILE__, 'kilobyte_io_activate' );

@@ -74,7 +74,7 @@ final class OptimizeOnServerUseCase {
 		$result = $this->attachments->with_attachment_lock(
 			$attachment_id,
 			function () use ( $attachment_id ) {
-				return $this->optimize_image( $attachment_id );
+				return $this->optimize_while_locked( $attachment_id );
 			}
 		);
 		return $result ?? new OperationFailure( OperationFailure::BUSY );
@@ -83,10 +83,12 @@ final class OptimizeOnServerUseCase {
 	/**
 	 * Encode an image while holding its lock.
 	 *
+	 * @internal The caller must already hold the attachment lock.
+	 *
 	 * @param int $id Attachment ID.
 	 * @return array<string, mixed>|OperationFailure
 	 */
-	private function optimize_image( int $id ) {
+	public function optimize_while_locked( int $id ) {
 		if ( ! $this->events->should_optimize( $id ) ) {
 			return array(
 				'id'      => $id,
@@ -95,12 +97,15 @@ final class OptimizeOnServerUseCase {
 			);
 		}
 		$image = $this->attachments->find_image( $id, true );
-		if ( null === $image || ! $this->policy->is_supported_source_mime( (string) $image['mime_type'] ) ) {
+		if ( null === $image ) {
 			return new OperationFailure( OperationFailure::MISSING_SOURCE );
+		}
+		if ( ! $this->policy->is_supported_source_mime( (string) $image['mime_type'] ) ) {
+			return new OperationFailure( OperationFailure::INVALID_MIME );
 		}
 
 		$existing = $this->attachments->get_record( $id );
-		if ( null !== $existing && ! $existing->is_unchanged() ) {
+		if ( null !== $existing && ! $existing->is_unchanged() && ! $this->attachments->has_changed_sibling_source( $id, $existing, $image ) ) {
 			return array(
 				'id'      => $id,
 				'skipped' => true,
@@ -112,7 +117,7 @@ final class OptimizeOnServerUseCase {
 		$encoded  = $this->compressor->compress_to_temp( (string) $image['file'], (string) $image['mime_type'], $settings );
 
 		if ( isset( $encoded['error'] ) ) {
-			return new OperationFailure( OperationFailure::ENCODE_FAILED, $encoded['error'] );
+			return new OperationFailure( $encoded['reason'] ?? OperationFailure::ENCODE_FAILED, $encoded['error'] );
 		}
 		if ( isset( $encoded['skip_reason'] ) ) {
 			if ( ! empty( $image['source_revision'] ) && in_array( $encoded['skip_reason'], array( OptimizationRecord::STATUS_ANIMATED, OptimizationRecord::STATUS_ORIGINAL_FORMAT_KEPT ), true ) ) {

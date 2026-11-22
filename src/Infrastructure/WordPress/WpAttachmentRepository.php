@@ -14,6 +14,7 @@ use Kilobyte\ImageOptimizer\Domain\Repository\AttachmentRepositoryInterface;
 use Kilobyte\ImageOptimizer\Domain\ValueObject\ImageFormat;
 use Kilobyte\ImageOptimizer\Domain\ValueObject\OptimizationRecord;
 use Kilobyte\ImageOptimizer\Domain\ValueObject\OptimizationSettings;
+use Kilobyte\ImageOptimizer\Domain\ValueObject\OperationFailure;
 use WP_Filesystem_Base;
 use WP_Query;
 
@@ -26,9 +27,20 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 	public const STATS_OPTION          = 'kilobyte_io_stats';
 	public const RECONCILE_OPTION      = 'kilobyte_io_stats_need_rebuild';
 	public const BACKUPS_PURGED_OPTION = 'kilobyte_io_backups_purged';
+	public const AUTO_PENDING          = '_kilobyte_io_auto_pending';
+	public const AUTO_ATTEMPTS         = '_kilobyte_io_auto_attempts';
+	public const NATIVE_PENDING        = '_kilobyte_io_native_pending';
+
+	private const MAX_CLEANUP_REFERENCES = 10000;
 
 	/** @var int Maximum GIF data read for delivery across this request. */
 	private int $gif_delivery_bytes_left = WpRasterImage::MAX_BYTES;
+
+	/** @var int Compressed bytes available to verify ambiguous changes on this queue page. */
+	private int $queue_verification_bytes_left = WpRasterImage::MAX_BYTES;
+
+	/** @var bool|null Whether a scheduled cleanup can check the site's references safely. */
+	private ?bool $cleanup_can_check_references = null;
 
 	/**
 	 * Return attachment metadata needed for processing, or null if invalid/outside uploads/missing.
@@ -196,11 +208,44 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 		}
 
 		$record = $this->get_record( $attachment_id );
-		if ( $record && in_array( _wp_relative_upload_path( $image['file'] ), $this->variant_paths( $attachment_id, $record ), true ) ) {
+		if ( $record && $this->is_recorded_variant( $image['file'], $record ) ) {
 			return false;
 		}
 
 		return ! is_wp_error( wp_get_image_editor( $image['file'], array( 'mime_type' => $image['mime_type'] ) ) );
+	}
+
+	/**
+	 * Verify the original without allocating decoded pixels.
+	 *
+	 * @param int                $attachment_id Attachment ID.
+	 * @param OptimizationRecord $record        Stored optimization.
+	 * @return bool
+	 */
+	public function has_verified_original( int $attachment_id, OptimizationRecord $record ): bool {
+		if ( '' === $record->source_revision() ) {
+			return false;
+		}
+		$image = $this->find_image( $attachment_id, true );
+		return null !== $image
+			&& $record->matches_source_hash( $image['source_hash'] )
+			&& ! $this->is_recorded_variant( $image['file'], $record );
+	}
+
+	/**
+	 * A generated copy can become the attachment's active file through another tool.
+	 *
+	 * @param string             $file   Canonical local file.
+	 * @param OptimizationRecord $record Stored optimization.
+	 * @return bool
+	 */
+	private function is_recorded_variant( string $file, OptimizationRecord $record ): bool {
+		$root = $this->uploads_root();
+		if ( null === $root || ! $record->is_sibling() || 0 !== strpos( $file, $root ) ) {
+			return false;
+		}
+		$relative = substr( $file, strlen( $root ) );
+		return $relative === $record->variant_path() || in_array( $relative, $record->variants(), true );
 	}
 
 	/**
@@ -221,6 +266,89 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 		}
 
 		return OptimizationRecord::from_array( $raw );
+	}
+
+	/**
+	 * Check the current source without decoding pixels or hashing an entire queue page.
+	 *
+	 * @param int                      $attachment_id Attachment ID.
+	 * @param OptimizationRecord       $record        Existing optimization.
+	 * @param array<string, mixed>|null $image         Source already read by an encoder, if available.
+	 * @return bool
+	 */
+	public function has_changed_sibling_source( int $attachment_id, OptimizationRecord $record, ?array $image = null ): bool {
+		if ( ! $record->is_sibling() || $record->has_backup() ) {
+			return false;
+		}
+		$file = $image['file'] ?? $this->resolve_safe_upload_file( get_attached_file( $attachment_id ) );
+		$root = $this->uploads_root();
+		if ( null === $file || null === $root || 0 !== strpos( $file, $root ) || $this->is_recorded_variant( $file, $record ) ) {
+			return false;
+		}
+		$source = substr( $file, strlen( $root ) );
+		$paths  = $record->variants();
+		if ( empty( $paths ) ) {
+			$paths = $this->variant_paths( $attachment_id, $record );
+		}
+		if ( ( $paths[ $source ] ?? '' ) !== $record->variant_path() ) {
+			return true;
+		}
+
+		$revision = $record->source_revision();
+		if ( '' !== $revision ) {
+			if ( ! empty( $image['source_revision'] ) ? $image['source_revision'] !== $revision : $this->source_differs_on_disk( $file, $record ) ) {
+				return true;
+			}
+		} else {
+			$optimized_at = '' !== $record->optimized_at() ? strtotime( $record->optimized_at() . ' UTC' ) : false;
+			if ( (int) wp_filesize( $file ) !== $record->original_size() || ( false !== $optimized_at && WpLocalFilesystem::get()->mtime( $file ) > $optimized_at ) ) {
+				return true;
+			}
+		}
+
+		$stamps = $record->thumbnail_stamps();
+		if ( empty( $stamps ) ) {
+			return false;
+		}
+		$matched = 0;
+		foreach ( $this->thumbnail_paths( $attachment_id, $file ) as $thumbnail ) {
+			$relative = substr( $thumbnail, strlen( $root ) );
+			if ( isset( $stamps[ $relative ] ) ) {
+				if ( $this->source_stamp( $thumbnail ) !== $stamps[ $relative ] ) {
+					return true;
+				}
+				++$matched;
+			}
+		}
+		return count( $stamps ) !== $matched;
+	}
+
+	/**
+	 * Verify a source whose filesystem timestamp can hide an edit made during the same second.
+	 *
+	 * @param string             $file   Current local source.
+	 * @param OptimizationRecord $record Existing optimization.
+	 * @return bool Whether the item should be checked by the encoder.
+	 */
+	private function source_differs_on_disk( string $file, OptimizationRecord $record ): bool {
+		$revision = explode( '|', $record->source_revision(), 2 );
+		$stamp    = $this->source_stamp( $file );
+		if ( '' === $stamp || $stamp !== $revision[0] ) {
+			return true;
+		}
+		$attributes = explode( ':', $stamp );
+		$saved_at   = '' !== $record->optimized_at() ? strtotime( $record->optimized_at() . ' UTC' ) : false;
+		if ( false !== $saved_at && max( (int) $attributes[2], (int) $attributes[3] ) < $saved_at ) {
+			return false;
+		}
+
+		$bytes = (int) $attributes[1];
+		if ( $bytes <= 0 || $bytes > $this->queue_verification_bytes_left ) {
+			// Leave an uncertain image eligible. Its encoder checks the saved hash before publishing.
+			return true;
+		}
+		$this->queue_verification_bytes_left -= $bytes;
+		return $this->source_hash( $file ) !== ( $revision[1] ?? '' );
 	}
 
 	/**
@@ -292,6 +420,7 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 				}
 				delete_post_meta( $attachment_id, '_kilobyte_io_auto_failure' );
 				delete_post_meta( $attachment_id, '_kilobyte_io_auto_skip' );
+				$this->clear_automatic_job( $attachment_id );
 				return true;
 			}
 		);
@@ -310,6 +439,9 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 				if ( null === $previous ) {
 					return true;
 				}
+				if ( ! $this->clear_automatic_job( $attachment_id ) ) {
+					return false;
+				}
 				$original = $this->load_counters();
 				if ( ! $this->write_counters( $this->subtract_record( $original, $previous ) ) ) {
 					return false;
@@ -324,13 +456,32 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 	}
 
 	/**
+	 * Cancel queued optimization before restoring the image or after a successful check.
+	 *
+	 * @param int $attachment_id Attachment ID.
+	 * @return bool Whether the job is absent.
+	 */
+	public function clear_automatic_job( int $attachment_id ): bool {
+		foreach ( array( self::NATIVE_PENDING, self::AUTO_PENDING ) as $key ) {
+			if ( metadata_exists( 'post', $attachment_id, $key ) && ! delete_post_meta( $attachment_id, $key ) ) {
+				return false;
+			}
+		}
+		if ( metadata_exists( 'post', $attachment_id, self::AUTO_ATTEMPTS ) ) {
+			delete_post_meta( $attachment_id, self::AUTO_ATTEMPTS );
+		}
+		return true;
+	}
+
+	/**
 	 * Restore an older backup to a new file while preserving published URLs.
 	 *
 	 * @param int    $attachment_id Attachment ID.
 	 * @param string $source_tmp_path Validated backup path.
-	 * @return array{dest_file: string, size: int, thumbnails_ready: bool}|null
+	 * @param int    $expected_bytes  Recorded original size, if available.
+	 * @return array{dest_file: string, size: int, thumbnails_ready: bool}|OperationFailure|null
 	 */
-	public function restore_file( int $attachment_id, string $source_tmp_path ): ?array {
+	public function restore_file( int $attachment_id, string $source_tmp_path, int $expected_bytes ) {
 		$filesystem    = WpLocalFilesystem::get();
 		$previous_path = get_attached_file( $attachment_id, true );
 		$previous_mime = (string) get_post_mime_type( $attachment_id );
@@ -338,10 +489,18 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 		$target_ext    = $file_type['ext'];
 		$target_mime   = $file_type['type'];
 		$dimensions    = wp_getimagesize( $source_tmp_path );
-		if ( 'attachment' !== get_post_type( $attachment_id ) || ! is_string( $target_ext ) || ! is_string( $target_mime )
-			|| ! is_array( $dimensions ) || ( $dimensions['mime'] ?? '' ) !== $target_mime
-		) {
+		$source_bytes  = (int) wp_filesize( $source_tmp_path );
+		if ( 'attachment' !== get_post_type( $attachment_id ) ) {
 			return null;
+		}
+		if ( ! is_string( $target_ext ) || ! is_string( $target_mime ) || ! is_array( $dimensions ) || ( $dimensions['mime'] ?? '' ) !== $target_mime
+			|| $source_bytes <= 0 || ( $expected_bytes > 0 && $source_bytes !== $expected_bytes )
+		) {
+			return new OperationFailure( OperationFailure::BACKUP_UNVERIFIED );
+		}
+		$limit_failure = WpRasterImage::limit_failure( $source_tmp_path, $target_mime );
+		if ( OperationFailure::INVALID_IMAGE === $limit_failure || ( null !== $limit_failure && $expected_bytes <= 0 ) ) {
+			return new OperationFailure( OperationFailure::BACKUP_UNVERIFIED );
 		}
 
 		$root      = $this->uploads_root();
@@ -358,7 +517,6 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 		require_once ABSPATH . 'wp-admin/includes/image.php';
 		$previous_meta = wp_get_attachment_metadata( $attachment_id, true );
 		$existing      = $this->resolve_safe_upload_file( $previous_path );
-		$source_bytes  = (int) wp_filesize( $source_tmp_path );
 
 		// A previous attempt may have recovered the file before the record could be cleared.
 		if ( null !== $existing && $target_mime === $previous_mime && $source_bytes > 0
@@ -393,10 +551,15 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 		$metadata['sizes']    = array();
 		$metadata['filesize'] = (int) wp_filesize( $restored );
 
-		$regenerated = $this->build_thumbnail_metadata( $attachment_id, $restored, $metadata );
-		if ( is_wp_error( $regenerated ) && 'invalid_image' === $regenerated->get_error_code() ) {
-			$this->discard_restore_files( $restored, $metadata );
-			return null;
+		$regenerated     = $this->build_thumbnail_metadata( $attachment_id, $restored, $metadata );
+		$thumbnail_files = is_array( $regenerated ) ? $regenerated['files'] : array();
+		if ( ! is_array( $regenerated ) && null === $limit_failure && ( 'image/gif' !== $target_mime || ! WpRasterImage::has_gif_animation( $restored ) ) ) {
+			$editor = is_wp_error( $regenerated ) ? $regenerated : wp_get_image_editor( $restored, array( 'mime_type' => $target_mime ) );
+			if ( is_wp_error( $editor ) && ( $expected_bytes <= 0 || 'image_no_editor' !== $editor->get_error_code() ) ) {
+				$filesystem->delete( $restored );
+				return new OperationFailure( OperationFailure::BACKUP_UNVERIFIED, $editor->get_error_message() );
+			}
+			unset( $editor );
 		}
 		if ( is_array( $regenerated ) ) {
 			$metadata   = $regenerated['metadata'];
@@ -407,7 +570,7 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 		}
 
 		if ( ! update_attached_file( $attachment_id, $restored ) ) {
-			$this->discard_restore_files( $restored, $metadata );
+			WpVariantRetirement::schedule_removed_files( $thumbnail_files );
 			return null;
 		}
 
@@ -419,22 +582,26 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 			true
 		);
 		if ( is_wp_error( $post_updated ) || ! $post_updated || ! wp_update_attachment_metadata( $attachment_id, $metadata ) ) {
-			if ( is_string( $previous_path ) && update_attached_file( $attachment_id, $previous_path ) ) {
-				$this->discard_restore_files( $restored, $metadata );
+			if ( is_string( $previous_path ) ) {
+				update_attached_file( $attachment_id, $previous_path );
+				if ( get_attached_file( $attachment_id, true ) === $previous_path ) {
+					wp_update_post(
+						array(
+							'ID'             => $attachment_id,
+							'post_mime_type' => $previous_mime,
+						)
+					);
+				}
 			}
-			wp_update_post(
-				array(
-					'ID'             => $attachment_id,
-					'post_mime_type' => $previous_mime,
-				)
-			);
+			// Keep the restored full-size file after WordPress has seen its path.
+			WpVariantRetirement::schedule_removed_files( $thumbnail_files );
 			return null;
 		}
 
 		return array(
 			'dest_file'        => $restored,
 			'size'             => $metadata['filesize'],
-			'thumbnails_ready' => is_array( $regenerated ) && $regenerated['complete'],
+			'thumbnails_ready' => is_array( $regenerated ),
 		);
 	}
 
@@ -622,7 +789,7 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 				$paths   = array_merge( $paths, $this->thumbnail_paths( $attachment_id, $file ) );
 				$paths[] = $file;
 				foreach ( $backup_sizes as $backup_size ) {
-					$name = $backup_size['file'] ?? '';
+					$name = is_array( $backup_size ) ? ( $backup_size['file'] ?? '' ) : '';
 					if ( is_string( $name ) && '' !== $name && wp_basename( $name ) === $name ) {
 						$paths[] = trailingslashit( dirname( $file ) ) . $name;
 					}
@@ -641,15 +808,15 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 	}
 
 	/**
-	 * Delete only the variant files owned by the record.
+	 * Queue cleanup after a failed save outside the request that wrote the files.
 	 *
 	 * @param int                $attachment_id Attachment ID.
 	 * @param OptimizationRecord $record        File owner.
-	 * @return bool
+	 * @return void
 	 */
-	public function delete_sibling_variant( int $attachment_id, OptimizationRecord $record ): bool {
+	public function discard_sibling_variant( int $attachment_id, OptimizationRecord $record ): void {
 		$paths = array_filter( $this->variant_paths( $attachment_id, $record ), array( $this, 'is_owned_variant_path' ) );
-		return ! empty( $paths ) && $this->delete_variant_files( $paths );
+		WpVariantRetirement::schedule_removed_files( $paths );
 	}
 
 	/**
@@ -659,15 +826,22 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 	 * @return bool
 	 */
 	public function delete_variant_files( array $paths ): bool {
+		// A different site can reference the same storage. Keep its files when we cannot verify ownership.
+		if ( is_multisite() ) {
+			return true;
+		}
 		$filesystem = WpLocalFilesystem::get();
 		$root       = $this->uploads_root();
 		if ( null === $root ) {
 			return empty( $paths );
 		}
 
-		$removed = true;
-		$basedir = trailingslashit( wp_get_upload_dir()['basedir'] );
+		$removed  = true;
+		$deadline = microtime( true ) + 4;
 		foreach ( $paths as $relative ) {
+			if ( microtime( true ) >= $deadline ) {
+				return false;
+			}
 			if ( ! $this->is_owned_variant_path( $relative ) ) {
 				$removed = false;
 				continue;
@@ -676,7 +850,7 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 			if ( ! $filesystem->exists( $file ) && ! is_link( $file ) ) {
 				continue;
 			}
-			if ( $this->has_current_attachment_reference( $relative, $file, $basedir . $relative ) ) {
+			if ( $this->has_attachment_reference( $relative ) ) {
 				continue;
 			}
 			if ( null === $this->resolve_safe_upload_file( $file ) || ! $filesystem->delete( $file ) ) {
@@ -691,21 +865,38 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 	 * An imported copy may now be the WordPress original for another attachment.
 	 *
 	 * @param string $relative Upload-relative file.
-	 * @param string $canonical Absolute canonical path.
-	 * @param string $configured Absolute path under WordPress's configured uploads directory.
 	 * @return bool Whether deletion must be skipped.
 	 */
-	private function has_current_attachment_reference( string $relative, string $canonical, string $configured ): bool {
+	private function has_attachment_reference( string $relative ): bool {
 		global $wpdb;
-		// Check the current reference directly so URL filters and stale caches cannot hide it.
+		if ( null === $this->cleanup_can_check_references ) {
+			// Count only up to the cleanup budget, using the core meta key index without reading meta values.
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+			$over_budget                        = $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT meta_id FROM {$wpdb->postmeta} FORCE INDEX (meta_key) WHERE meta_key IN (%s, %s, %s, %s) LIMIT %d, 1",
+					'_wp_attached_file',
+					'_wp_attachment_metadata',
+					'_wp_attachment_backup_sizes',
+					self::META_KEY,
+					self::MAX_CLEANUP_REFERENCES
+				)
+			);
+			$this->cleanup_can_check_references = null === $over_budget && '' === $wpdb->last_error;
+		}
+		if ( ! $this->cleanup_can_check_references ) {
+			return true;
+		}
+		// Only scheduled cleanup checks these indexed meta keys. A basename match deliberately keeps ambiguous files.
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		$reference = $wpdb->get_var(
 			$wpdb->prepare(
-				"SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key = %s AND meta_value IN (%s, %s, %s) LIMIT 1",
+				"SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key IN (%s, %s, %s, %s) AND meta_value LIKE %s LIMIT 1",
 				'_wp_attached_file',
-				$relative,
-				$canonical,
-				$configured
+				'_wp_attachment_metadata',
+				'_wp_attachment_backup_sizes',
+				self::META_KEY,
+				'%' . $wpdb->esc_like( wp_basename( $relative ) ) . '%'
 			)
 		);
 		return null !== $reference || '' !== $wpdb->last_error;
@@ -773,7 +964,7 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 			return false;
 		}
 		$owner = null === $attachment_id ? '(?:\d+-)?' : $attachment_id . '-';
-		return 1 === preg_match( '/\.kilobyte-' . $owner . '[a-f0-9-]{36}\.(?:jpg|png|webp|avif)$/iD', $relative );
+		return 1 === preg_match( '/\.kilobyte-' . $owner . '[a-f0-9-]{36}\.(?:jpe?g|png|gif|bmp|webp|avif)$/iD', $relative );
 	}
 
 	/**
@@ -797,8 +988,8 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 	 * @return int|null
 	 */
 	public function regenerate_thumbnails( int $attachment_id ): ?int {
-		$image = $this->find_image( $attachment_id );
-		if ( null === $image || ! wp_attachment_is_image( $attachment_id ) ) {
+		$image = $this->find_image( $attachment_id, true );
+		if ( empty( $image['source_revision'] ) || ! wp_attachment_is_image( $attachment_id ) ) {
 			return null;
 		}
 
@@ -812,10 +1003,15 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 			return null;
 		}
 		$metadata = $result['metadata'];
-		if ( $previous !== $metadata && ! wp_update_attachment_metadata( $attachment_id, $metadata ) ) {
+		$current  = $this->find_image( $attachment_id, true );
+		if ( ( $current['source_revision'] ?? '' ) !== $image['source_revision'] || $current['file'] !== $image['file']
+			|| wp_get_attachment_metadata( $attachment_id, true ) !== $previous
+			|| ( $previous !== $metadata && ! wp_update_attachment_metadata( $attachment_id, $metadata ) )
+		) {
+			WpVariantRetirement::schedule_removed_files( $result['files'] );
 			return null;
 		}
-		return $result['complete'] ? $result['count'] : null;
+		return $result['count'];
 	}
 
 	/**
@@ -824,7 +1020,7 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 	 * @param int                  $attachment_id Attachment ID.
 	 * @param string               $file          Local image.
 	 * @param array<string, mixed> $metadata      Metadata to preserve.
-	 * @return array{metadata: array<string, mixed>, count: int, complete: bool}|\WP_Error|null
+	 * @return array{metadata: array<string, mixed>, count: int, files: string[]}|\WP_Error|null
 	 */
 	private function build_thumbnail_metadata( int $attachment_id, string $file, array $metadata ) {
 		$mime = wp_get_image_mime( $file );
@@ -832,33 +1028,90 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 			return null;
 		}
 
-		$editor = wp_get_image_editor( $file, array( 'mime_type' => $mime ) );
-		if ( is_wp_error( $editor ) ) {
-			return $editor;
-		}
-		$size = $editor->get_size();
-		if ( ! is_array( $size ) ) {
+		$root       = $this->uploads_root();
+		$directory  = trailingslashit( dirname( $file ) );
+		$work_dir   = $directory . 'kilobyte-work-' . wp_generate_uuid4();
+		$filesystem = WpLocalFilesystem::get();
+		if ( null === $root || 0 !== strpos( $directory, $root ) || ! $filesystem->mkdir( $work_dir, 0700 ) || realpath( $work_dir ) !== $work_dir ) {
 			return null;
 		}
+		$staging = trailingslashit( $work_dir );
+		$files   = array();
+		$ready   = false;
 
-		$metadata['file']   = _wp_relative_upload_path( $file );
-		$metadata['width']  = $size['width'];
-		$metadata['height'] = $size['height'];
-		$sizes              = $this->requested_thumbnail_sizes( $attachment_id, $metadata );
-		if ( null === $sizes ) {
-			return null;
-		}
+		try {
+			$source = $staging . wp_basename( $file );
+			if ( ! $filesystem->copy( $file, $source ) || wp_filesize( $file ) !== wp_filesize( $source ) ) {
+				return null;
+			}
+			$editor = wp_get_image_editor( $source, array( 'mime_type' => $mime ) );
+			if ( is_wp_error( $editor ) ) {
+				return $editor;
+			}
+			$size = $editor->get_size();
+			if ( ! is_array( $size ) ) {
+				return null;
+			}
 
-		$generated = $editor->multi_resize( $sizes );
-		if ( ! is_array( $generated ) ) {
-			return null;
+			$metadata['file']   = _wp_relative_upload_path( $file );
+			$metadata['width']  = $size['width'];
+			$metadata['height'] = $size['height'];
+			$sizes              = $this->requested_thumbnail_sizes( $attachment_id, $metadata );
+			if ( null === $sizes ) {
+				return null;
+			}
+
+			$generated = $editor->multi_resize( $sizes );
+			unset( $editor );
+			if ( ! is_array( $generated ) || array_diff_key( $sizes, $generated ) ) {
+				return null;
+			}
+			$generated = array_intersect_key( $generated, $sizes );
+			$published = array();
+			foreach ( $generated as $slug => $data ) {
+				$name = is_array( $data ) ? ( $data['file'] ?? '' ) : '';
+				if ( ! is_string( $name ) || '' === $name || wp_basename( $name ) !== $name || validate_file( $name ) ) {
+					return null;
+				}
+				if ( ! isset( $published[ $name ] ) ) {
+					$thumbnail = $this->resolve_safe_upload_file( $staging . $name );
+					$type      = wp_check_filetype( $name );
+					if ( null === $thumbnail || $source === $thumbnail || 0 !== strpos( $thumbnail, $staging )
+						|| ! is_string( $type['ext'] ) || wp_get_image_mime( $thumbnail ) !== $type['type']
+					) {
+						return null;
+					}
+					$destination = $directory . 'thumbnail.kilobyte-' . $attachment_id . '-' . wp_generate_uuid4() . '.' . $type['ext'];
+					$relative    = substr( $destination, strlen( $root ) );
+					if ( ! $this->is_owned_variant_path( $relative, $attachment_id ) || ! $this->publish_file( $filesystem, $thumbnail, $destination ) ) {
+						return null;
+					}
+					$files[]            = $relative;
+					$published[ $name ] = wp_basename( $destination );
+				}
+				$generated[ $slug ]['file'] = $published[ $name ];
+			}
+			$metadata['sizes'] = array_replace( (array) ( $metadata['sizes'] ?? array() ), $generated );
+			$ready             = true;
+			return array(
+				'metadata' => $metadata,
+				'count'    => count( $generated ),
+				'files'    => $files,
+			);
+		} finally {
+			if ( realpath( $work_dir ) === $work_dir ) {
+				foreach ( (array) $filesystem->dirlist( $staging ) as $entry ) {
+					$name = $entry['name'] ?? '';
+					if ( '' !== $name && wp_basename( $name ) === $name && ! validate_file( $name ) && 'd' !== $entry['type'] ) {
+						$filesystem->delete( $staging . $name, false, 'f' );
+					}
+				}
+				$filesystem->rmdir( $work_dir );
+			}
+			if ( ! $ready ) {
+				WpVariantRetirement::schedule_removed_files( $files );
+			}
 		}
-		$metadata['sizes'] = array_replace( (array) ( $metadata['sizes'] ?? array() ), $generated );
-		return array(
-			'metadata' => $metadata,
-			'count'    => count( $generated ),
-			'complete' => ! array_diff_key( $sizes, $generated ),
-		);
 	}
 
 	/**
@@ -889,26 +1142,6 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 	}
 
 	/**
-	 * Clean up new files when a legacy restore fails before publishing the record.
-	 *
-	 * @param string               $file     Staged restored original.
-	 * @param array<string, mixed> $metadata New metadata.
-	 * @return void
-	 */
-	private function discard_restore_files( string $file, array $metadata ): void {
-		$filesystem = WpLocalFilesystem::get();
-		$directory  = trailingslashit( dirname( $file ) );
-		$prefix     = pathinfo( $file, PATHINFO_FILENAME ) . '-';
-		foreach ( (array) ( $metadata['sizes'] ?? array() ) as $size ) {
-			$name = $size['file'] ?? '';
-			if ( is_string( $name ) && wp_basename( $name ) === $name && 0 === strpos( $name, $prefix ) && null !== $this->resolve_safe_upload_file( $directory . $name ) ) {
-				$filesystem->delete( $directory . $name );
-			}
-		}
-		$filesystem->delete( $file );
-	}
-
-	/**
 	 * Read a bounded page of eligible images before an attachment ID.
 	 *
 	 * @param string $mode     Queue mode.
@@ -918,14 +1151,15 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 	 * @return array<string, mixed>
 	 */
 	public function get_queue_page( string $mode, int $before, int $per_page, bool $check_permissions = true ): array {
-		$per_page    = max( 1, min( 100, $per_page ) );
-		$posts       = $this->query_images( $before, $per_page + 1 );
-		$has_more    = count( $posts ) > $per_page;
-		$posts       = array_slice( $posts, 0, $per_page );
-		$items       = array();
-		$unavailable = array();
-		$cursor      = 0;
-		$keep_gif    = 'optimize' === $mode && $this->keeps_gif_format();
+		$this->queue_verification_bytes_left = WpRasterImage::MAX_BYTES;
+		$per_page                            = max( 1, min( 100, $per_page ) );
+		$posts                               = $this->query_images( $before, $per_page + 1 );
+		$has_more                            = count( $posts ) > $per_page;
+		$posts                               = array_slice( $posts, 0, $per_page );
+		$items                               = array();
+		$unavailable                         = array();
+		$cursor                              = 0;
+		$keep_gif                            = 'optimize' === $mode && $this->keeps_gif_format();
 
 		foreach ( $posts as $post ) {
 			$attachment_id = (int) $post->ID;
@@ -936,7 +1170,10 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 
 			$record = $this->get_record( $attachment_id );
 			if ( 'optimize' === $mode && null !== $record && ( $keep_gif || OptimizationRecord::STATUS_ORIGINAL_FORMAT_KEPT !== $record->status() ) ) {
-				if ( ! $record->is_unchanged() || '' === $record->source_revision() || $this->checked_source_has_same_stamp( $attachment_id, $record ) ) {
+				$eligible = $record->is_unchanged()
+					? '' !== $record->source_revision() && ! $this->checked_source_has_same_stamp( $attachment_id, $record )
+					: $this->has_changed_sibling_source( $attachment_id, $record );
+				if ( ! $eligible ) {
 					continue;
 				}
 			}

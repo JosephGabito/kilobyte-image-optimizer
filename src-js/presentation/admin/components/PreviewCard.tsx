@@ -18,7 +18,7 @@ import {
 	__experimentalVStack as VStack,
 } from '@wordpress/components';
 import { check, download, media, seen, upload } from '@wordpress/icons';
-import { toFriendlyError, type FriendlyError } from '../../../domain/errors';
+import { canUseServerAfterBrowserSave, toFriendlyError, type FriendlyError } from '../../../domain/errors';
 import { formatBytes, isSupportedMime } from '../../../domain/format';
 import { QUALITY_PRESETS, inferPresetFromQuality, type QualityPresetId } from '../../../domain/presets';
 import type { OutputFormat, PluginSettings } from '../../../domain/types';
@@ -339,20 +339,10 @@ export function PreviewCard( {
 			}
 			await onOptimized?.();
 		} catch ( err ) {
-			const code = ( err as { code?: string } )?.code;
-			if ( ! useSiteSettings && ( code === 'kilobyte_io_invalid_image' || code === 'kilobyte_io_invalid_mime' ) ) {
+			if ( ! useSiteSettings && canUseServerAfterBrowserSave( err ) ) {
 				setSiteRejectedPreview( true );
-				onSaveMessage(
-					filename,
-					__( 'WordPress could not save this preview. Choose another format or use the site settings.', 'kilobyte-image-optimizer' ),
-					'info'
-				);
-			} else {
-				if ( code === 'kilobyte_io_source_changed' ) {
-					setSiteRejectedPreview( true );
-				}
-				onSaveError( err, filename );
 			}
+			onSaveError( err, filename );
 		} finally {
 			setOptimizing( false );
 			onFinishSave();

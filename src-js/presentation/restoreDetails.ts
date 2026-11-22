@@ -9,5 +9,8 @@ export function restoreDetails( result: RestoreResponse ): string | undefined {
 	if ( result.backup_removed === false ) {
 		details.push( __( 'The legacy backup is still in the kilobyte-backups folder under uploads.', 'kilobyte-image-optimizer' ) );
 	}
+	if ( result.copy_retained ) {
+		details.push( __( 'The old optimized copy is still saved on your site.', 'kilobyte-image-optimizer' ) );
+	}
 	return details.join( ' ' ) || undefined;
 }

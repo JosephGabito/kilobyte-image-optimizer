@@ -9,6 +9,8 @@ declare(strict_types=1);
 
 namespace Kilobyte\ImageOptimizer\Infrastructure\WordPress;
 
+use Kilobyte\ImageOptimizer\Domain\ValueObject\OperationFailure;
+
 /**
  * Checks that a local file has the expected raster type and safe dimensions.
  */
@@ -26,20 +28,43 @@ final class WpRasterImage {
 	 * @return bool
 	 */
 	public static function is_bounded( string $path, string $mime, bool $apply_upload_limit = false ): bool {
-		$bytes     = wp_filesize( $path );
-		$max_bytes = $apply_upload_limit ? min( self::MAX_BYTES, wp_max_upload_size() ) : self::MAX_BYTES;
-		if ( $bytes <= 0 || $bytes > $max_bytes ) {
-			return false;
+		return null === self::limit_failure( $path, $mime, $apply_upload_limit );
+	}
+
+	/**
+	 * Describe why an image cannot be decoded within this request's limits.
+	 *
+	 * @param string $path               Local image path.
+	 * @param string $mime               Expected raster MIME.
+	 * @param bool   $apply_upload_limit Whether this file needs to fit the upload limit.
+	 * @return string|null
+	 */
+	public static function limit_failure( string $path, string $mime, bool $apply_upload_limit = false ): ?string {
+		$bytes = wp_filesize( $path );
+		if ( $bytes <= 0 ) {
+			return OperationFailure::INVALID_IMAGE;
+		}
+		if ( $apply_upload_limit && $bytes > wp_max_upload_size() ) {
+			return OperationFailure::UPLOAD_TOO_LARGE;
+		}
+		if ( $bytes > self::MAX_BYTES ) {
+			return OperationFailure::IMAGE_TOO_LARGE;
 		}
 
 		$size = wp_getimagesize( $path );
-		if ( ! is_array( $size ) || ( $size['mime'] ?? '' ) !== $mime || empty( $size[0] ) || empty( $size[1] ) || $size[0] * $size[1] > self::MAX_PIXELS ) {
-			return false;
+		if ( ! is_array( $size ) || ( $size['mime'] ?? '' ) !== $mime || empty( $size[0] ) || empty( $size[1] ) ) {
+			return OperationFailure::INVALID_IMAGE;
+		}
+		if ( $size[0] * $size[1] > self::MAX_PIXELS ) {
+			return OperationFailure::IMAGE_TOO_LARGE;
 		}
 
 		// Leave room for the decoded image, the resized copy, and the encoder.
 		$limit = wp_convert_hr_to_bytes( (string) ini_get( 'memory_limit' ) );
-		return $limit <= 0 || memory_get_usage( true ) + $bytes * 2 + $size[0] * $size[1] * 8 + 2 * MB_IN_BYTES < $limit;
+		if ( $limit > 0 && memory_get_usage( true ) + $bytes * 2 + $size[0] * $size[1] * 8 + 2 * MB_IN_BYTES >= $limit ) {
+			return OperationFailure::SERVER_IMAGE_LIMIT;
+		}
+		return null;
 	}
 	/**
 	 * Check formats that can store a sequence of frames.

@@ -1,4 +1,5 @@
 import { formatBytes, resolveTargetMime } from '../domain/format';
+import { canUseServerAfterBrowserSave, OptimizationFallbackError } from '../domain/errors';
 import type { BrowserSupport, CompressionResult, OptimizeResponse, PluginSettings, QueueItem } from '../domain/types';
 
 export interface CompressorPort {
@@ -75,9 +76,12 @@ export async function optimizeQueueItem(
 		}
 		return outcome( await api.uploadOptimized( item.id, result.file, result.filename, { sourceHash: result.sourceHash } ) );
 	} catch ( error ) {
-		const code = ( error as { code?: string } )?.code;
-		if ( code === 'kilobyte_io_invalid_mime' || code === 'kilobyte_io_invalid_image' || code === 'kilobyte_io_source_changed' ) {
-			return onServer();
+		if ( canUseServerAfterBrowserSave( error ) ) {
+			try {
+				return await onServer();
+			} catch ( serverError ) {
+				throw new OptimizationFallbackError( error, serverError );
+			}
 		}
 		throw error;
 	}

@@ -255,6 +255,24 @@ final class OptimizationRecord {
 	}
 
 	/**
+	 * @return string Original file checksum, if available.
+	 */
+	public function source_hash(): string {
+		return explode( '|', $this->source_revision, 2 )[1] ?? '';
+	}
+
+	/**
+	 * Compare the original's saved checksum with a current checksum.
+	 *
+	 * @param string $hash Current checksum.
+	 * @return bool
+	 */
+	public function matches_source_hash( string $hash ): bool {
+		$saved_hash = $this->source_hash();
+		return '' !== $saved_hash && hash_equals( $saved_hash, $hash );
+	}
+
+	/**
 	 * @return array<string, string> Original sub-size revisions by upload-relative path.
 	 */
 	public function thumbnail_stamps(): array {

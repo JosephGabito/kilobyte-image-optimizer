@@ -11,6 +11,24 @@ import type {
 
 const BASE = '/kilobyte-io/v1';
 
+async function refreshNonce(): Promise< boolean > {
+	const { nonceEndpoint, nonceMiddleware } = apiFetch;
+	if ( ! nonceEndpoint || ! nonceMiddleware ) {
+		return false;
+	}
+	try {
+		const response = await fetch( nonceEndpoint, { credentials: 'same-origin' } );
+		const nonce = response.ok ? ( await response.text() ).trim() : '';
+		if ( ! nonce || nonce === '0' || nonce === '-1' ) {
+			return false;
+		}
+		nonceMiddleware.nonce = nonce;
+		return true;
+	} catch {
+		return false;
+	}
+}
+
 export const wpRestClient = {
 	getStats(): Promise< LibraryStats > {
 		return apiFetch< LibraryStats >( { path: `${ BASE }/stats` } );
@@ -97,7 +115,7 @@ export const wpRestClient = {
 		}
 	},
 
-	uploadOptimized(
+	async uploadOptimized(
 		id: number,
 		file: File,
 		filename: string,
@@ -111,10 +129,35 @@ export const wpRestClient = {
 		if ( options.sourceHash ) {
 			body.append( 'source_hash', options.sourceHash );
 		}
-		return apiFetch< OptimizeResponse >( {
+		const request = {
 			path: `${ BASE }/optimize/${ id }`,
 			method: 'POST',
 			body,
+		};
+		const send = async ( allowRefresh: boolean ): Promise< Response > => {
+			try {
+				// Keep HTTP status even when a proxy sends HTML or the nonce needs refreshing.
+				return await apiFetch( { ...request, parse: false } );
+			} catch ( error ) {
+				if ( ! ( error instanceof Response ) ) {
+					throw error;
+				}
+				const parsed = error.headers.get( 'content-type' )?.includes( 'json' )
+					? await error.json().catch( () => null )
+					: null;
+				if ( allowRefresh && parsed?.code === 'rest_cookie_invalid_nonce' && await refreshNonce() ) {
+					return send( false );
+				}
+				throw {
+					code: parsed?.code,
+					message: parsed?.message ?? `HTTP ${ error.status } saving optimized image`,
+					data: { ...parsed?.data, status: error.status },
+				};
+			}
+		};
+		const response = await send( true );
+		return response.json().catch( () => {
+			throw { code: 'invalid_json', message: 'WordPress did not return a valid JSON response.' };
 		} );
 	},
 

@@ -9,7 +9,6 @@ declare(strict_types=1);
 
 namespace Kilobyte\ImageOptimizer\Presentation\Hooks;
 
-use Kilobyte\ImageOptimizer\Application\OptimizeOnServerUseCase;
 use Kilobyte\ImageOptimizer\Domain\Policy\AltTextPolicy;
 use Kilobyte\ImageOptimizer\Domain\Policy\CompressionPolicy;
 use Kilobyte\ImageOptimizer\Domain\ValueObject\OperationFailure;
@@ -24,10 +23,6 @@ use Kilobyte\ImageOptimizer\Domain\Repository\SettingsRepositoryInterface;
  * Integrates Kilobyte with WordPress Media Library and frontend image rendering.
  */
 final class MediaHooks {
-
-	private const NATIVE_PENDING = '_kilobyte_io_native_pending';
-	private const AUTO_FAILURE   = '_kilobyte_io_auto_failure';
-	private const AUTO_SKIP      = '_kilobyte_io_auto_skip';
 
 	/**
 	 * Settings repository.
@@ -50,11 +45,11 @@ final class MediaHooks {
 	private array $pending_deletions = array();
 
 	/**
-	 * Server fallback use case.
+	 * Background upload optimization.
 	 *
-	 * @var OptimizeOnServerUseCase
+	 * @var AutomaticUploadOptimization
 	 */
-	private OptimizeOnServerUseCase $optimize_server;
+	private AutomaticUploadOptimization $automatic_uploads;
 
 	/**
 	 * Alt text policy.
@@ -108,7 +103,7 @@ final class MediaHooks {
 	 * @param SettingsRepositoryInterface   $settings           Settings repository.
 	 * @param WpVariantRetirement            $retirement         Retired variant storage.
 	 * @param WpAttachmentRepository $attachments        Attachment repository.
-	 * @param OptimizeOnServerUseCase       $optimize_server    Server optimization use case.
+	 * @param AutomaticUploadOptimization   $automatic_uploads Deferred upload work.
 	 * @param AltTextPolicy                 $alt_text_policy    Alt text policy.
 	 * @param CompressionPolicy             $compression_policy Compression policy.
 	 * @param string                        $plugin_url         Plugin URL.
@@ -119,7 +114,7 @@ final class MediaHooks {
 		SettingsRepositoryInterface $settings,
 		WpAttachmentRepository $attachments,
 		WpVariantRetirement $retirement,
-		OptimizeOnServerUseCase $optimize_server,
+		AutomaticUploadOptimization $automatic_uploads,
 		AltTextPolicy $alt_text_policy,
 		CompressionPolicy $compression_policy,
 		string $plugin_url,
@@ -129,7 +124,7 @@ final class MediaHooks {
 		$this->settings           = $settings;
 		$this->attachments        = $attachments;
 		$this->retirement         = $retirement;
-		$this->optimize_server    = $optimize_server;
+		$this->automatic_uploads  = $automatic_uploads;
 		$this->alt_text_policy    = $alt_text_policy;
 		$this->compression_policy = $compression_policy;
 		$this->plugin_url         = $plugin_url;
@@ -147,12 +142,12 @@ final class MediaHooks {
 		add_action( 'wp_enqueue_media', array( $this, 'enqueue_media_modal_assets' ) );
 		add_filter( 'rest_request_before_callbacks', array( $this, 'enter_core_upload' ), 10, 3 );
 		add_filter( 'rest_request_after_callbacks', array( $this, 'leave_core_upload' ), 10, 3 );
+		add_action( 'rest_after_insert_attachment', array( $this, 'record_native_upload' ), 10, 3 );
 		add_action( 'add_attachment', array( $this, 'maybe_set_auto_alt_text' ) );
 		add_action( 'added_post_meta', array( $this, 'maybe_reset_image_check' ), 10, 3 );
 		add_action( 'updated_post_meta', array( $this, 'maybe_reset_image_check' ), 10, 3 );
 		add_filter( 'pre_delete_attachment', array( $this, 'before_delete_attachment' ), PHP_INT_MAX, 2 );
 		add_action( 'deleted_post', array( $this, 'after_delete_attachment' ), 10, 2 );
-		add_action( 'kilobyte_io_retry_variant_cleanup', array( $this, 'retry_variant_cleanup' ), 10, 2 );
 		add_filter( 'wp_generate_attachment_metadata', array( $this, 'maybe_server_fallback_on_upload' ), 20, 3 );
 		add_filter( 'manage_media_columns', array( $this, 'add_media_column' ) );
 		add_action( 'manage_media_custom_column', array( $this, 'render_media_column' ), 10, 2 );
@@ -255,6 +250,9 @@ final class MediaHooks {
 		if ( null !== $record && $record->is_sibling() && $record->variants() ) {
 			$paths = array_merge( $paths, array_values( $this->attachments->variant_paths( $id, $record ) ) );
 		}
+		if ( $paths ) {
+			$paths = array_diff( $paths, array_keys( $this->attachments->attachment_image_paths( $id ) ) );
+		}
 		$this->pending_deletions[ $key ] = array(
 			'paths'   => array_values( array_unique( array_filter( $paths, array( $this->attachments, 'is_owned_variant_path' ) ) ) ),
 			'record'  => $record,
@@ -280,7 +278,7 @@ final class MediaHooks {
 		unset( $this->pending_deletions[ $key ] );
 		try {
 			$record = $pending['record'];
-			$this->retry_variant_cleanup( $pending['paths'], 0 );
+			WpVariantRetirement::schedule_removed_files( $pending['paths'] );
 			if ( null !== $record ) {
 				if ( ! $this->attachments->remove_deleted_record( $record ) ) {
 					update_option( WpAttachmentRepository::RECONCILE_OPTION, true, false );
@@ -290,19 +288,6 @@ final class MediaHooks {
 			do_action( 'kilobyte_io_variant_changed', $id );
 		} finally {
 			$pending['release']();
-		}
-	}
-
-	/**
-	 * Retry removal if a file was unavailable during permanent deletion.
-	 *
-	 * @param string[] $paths   Recorded file paths.
-	 * @param int      $attempt Retry count.
-	 * @return void
-	 */
-	public function retry_variant_cleanup( array $paths, int $attempt ): void {
-		if ( ! empty( $paths ) && ! $this->attachments->delete_variant_files( $paths ) && $attempt < 3 ) {
-			wp_schedule_single_event( time() + HOUR_IN_SECONDS, 'kilobyte_io_retry_variant_cleanup', array( $paths, $attempt + 1 ) );
 		}
 	}
 
@@ -334,30 +319,36 @@ final class MediaHooks {
 	 * @return mixed
 	 */
 	public function leave_core_upload( $response, array $handler, \WP_REST_Request $request ) {
-		$key  = spl_object_id( $request );
-		$mode = $this->browser_managed_uploads[ $key ] ?? '';
-		unset( $this->browser_managed_uploads[ $key ] );
+		unset( $this->browser_managed_uploads[ spl_object_id( $request ) ] );
 
-		if ( ! $response instanceof \WP_REST_Response || $response->get_status() >= 400 ) {
-			return $response;
-		}
-
-		if ( 'native' === $mode && $this->settings->load()->is_enabled() ) {
-			$data = $response->get_data();
-			$id   = (int) ( $data['id'] ?? 0 );
-			if ( $id > 0 && wp_attachment_is_image( $id ) ) {
-				update_post_meta( $id, self::NATIVE_PENDING, true );
-			}
-		} elseif ( 'POST' === $request->get_method() && preg_match( '~^/wp/v2/media/([0-9]+)/finalize/?$~D', $request->get_route(), $match ) ) {
-			$id = (int) $match[1];
-			if ( get_post_meta( $id, self::NATIVE_PENDING, true ) ) {
-				delete_post_meta( $id, self::NATIVE_PENDING );
-				if ( $this->settings->load()->is_enabled() ) {
-					$this->optimize_upload( $id );
-				}
-			}
+		if ( $response instanceof \WP_REST_Response && $response->get_status() < 400 && 'POST' === $request->get_method()
+			&& preg_match( '~^/wp/v2/media/([0-9]+)/finalize/?$~D', $request->get_route(), $match )
+		) {
+			$this->automatic_uploads->enqueue( (int) $match[1], true );
 		}
 		return $response;
+	}
+
+	/**
+	 * Mark native uploads using the attachment ID even when REST filters response fields.
+	 *
+	 * @param \WP_Post         $attachment The new attachment.
+	 * @param \WP_REST_Request $request    Upload request.
+	 * @param bool             $creating   Whether WordPress is creating the attachment.
+	 * @return void
+	 */
+	public function record_native_upload( \WP_Post $attachment, \WP_REST_Request $request, bool $creating ): void {
+		try {
+			if ( $creating && 'native' === ( $this->browser_managed_uploads[ spl_object_id( $request ) ] ?? '' )
+				&& $this->settings->load()->is_enabled()
+				&& $this->compression_policy->is_supported_source_mime( $attachment->post_mime_type )
+			) {
+				update_post_meta( $attachment->ID, WpAttachmentRepository::NATIVE_PENDING, true );
+			}
+		} catch ( \Throwable $error ) {
+			// Keep the original upload available if a third-party hook interrupts optional optimization.
+			return;
+		}
 	}
 
 	/**
@@ -410,60 +401,15 @@ final class MediaHooks {
 
 		$settings = $this->settings->load();
 		$mime     = (string) get_post_mime_type( $attachment_id );
-		if ( empty( $this->browser_managed_uploads ) && 'create' === $context && $settings->is_enabled() && $this->compression_policy->is_supported_source_mime( $mime ) ) {
-			$this->optimize_upload( $attachment_id );
+		if ( 'create' === $context && $settings->is_enabled() && $this->compression_policy->is_supported_source_mime( $mime )
+			&& ! in_array( 'native', $this->browser_managed_uploads, true )
+		) {
+			// Give the browser time to finish. If the tab closes, WordPress can still make a copy.
+			$delay = in_array( 'kilobyte', $this->browser_managed_uploads, true ) ? 5 * MINUTE_IN_SECONDS : 10;
+			$this->automatic_uploads->enqueue( $attachment_id, false, $delay );
 		}
 
 		return $metadata;
-	}
-
-	/**
-	 * Optimize a newly saved copy and remember failures for the Media Library.
-	 *
-	 * @param int $attachment_id Attachment ID.
-	 * @return void
-	 */
-	private function optimize_upload( int $attachment_id ): void {
-		$result = $this->optimize_server->execute( $attachment_id );
-		if ( $result instanceof OperationFailure ) {
-			$this->store_upload_status( $attachment_id, self::AUTO_FAILURE, $result->reason() );
-			delete_post_meta( $attachment_id, self::AUTO_SKIP );
-		} elseif ( ! empty( $result['skipped'] ) && ! empty( $result['status'] ) && null === $this->attachments->get_record( $attachment_id ) ) {
-			$this->store_upload_status( $attachment_id, self::AUTO_SKIP, (string) $result['status'] );
-			delete_post_meta( $attachment_id, self::AUTO_FAILURE );
-		}
-	}
-
-	/**
-	 * @param int    $attachment_id Attachment ID.
-	 * @param string $key           Metadata key.
-	 * @param string $reason        Outcome code.
-	 * @return void
-	 */
-	private function store_upload_status( int $attachment_id, string $key, string $reason ): void {
-		update_post_meta(
-			$attachment_id,
-			$key,
-			array(
-				'reason' => $reason,
-				'stamp'  => $this->attachments->attachment_source_stamp( $attachment_id ),
-			)
-		);
-	}
-
-	/**
-	 * @param int    $attachment_id Attachment ID.
-	 * @param string $key           Metadata key.
-	 * @return string Outcome for the current file only.
-	 */
-	private function get_upload_status( int $attachment_id, string $key ): string {
-		$stored = get_post_meta( $attachment_id, $key, true );
-		if ( is_string( $stored ) ) {
-			return $stored;
-		}
-		return is_array( $stored ) && ( $stored['stamp'] ?? '' ) === $this->attachments->attachment_source_stamp( $attachment_id )
-			? (string) ( $stored['reason'] ?? '' )
-			: '';
 	}
 
 	/**
@@ -504,21 +450,28 @@ final class MediaHooks {
 	 * @return string
 	 */
 	private function upload_status( int $attachment_id ): string {
-		$reason = $this->get_upload_status( $attachment_id, self::AUTO_FAILURE );
+		$status = $this->automatic_uploads->status( $attachment_id );
+		$reason = $status['failure'];
 		if ( '' === $reason ) {
-			$skip = $this->get_upload_status( $attachment_id, self::AUTO_SKIP );
-			return '' !== $skip
-				? esc_html( OperationErrorMessage::describe_skip( $skip ) )
+			if ( $status['pending'] ) {
+				return sprintf(
+					'%s <a href="%s">%s</a>',
+					esc_html__( 'Original saved. Optimization is queued.', 'kilobyte-image-optimizer' ),
+					esc_url( admin_url( 'upload.php?page=' . OptimizerAdminPage::PAGE_SLUG ) ),
+					esc_html__( 'Optimize now in Media', 'kilobyte-image-optimizer' )
+				);
+			}
+			return '' !== $status['skip']
+				? esc_html( OperationErrorMessage::describe_skip( $status['skip'] ) )
 				: esc_html__( 'Not optimized', 'kilobyte-image-optimizer' );
 		}
 		$error = OperationErrorMessage::to_wp_error( new OperationFailure( $reason ) );
 		return sprintf(
-			'%s <a href="%s">%s</a><details><summary>%s</summary>%s</details>',
-			esc_html__( 'Original saved. The smaller copy needs another try.', 'kilobyte-image-optimizer' ),
+			'%s %s <a href="%s">%s</a>',
+			esc_html__( 'Original saved.', 'kilobyte-image-optimizer' ),
+			esc_html( $error->get_error_message() ),
 			esc_url( admin_url( 'upload.php?page=' . OptimizerAdminPage::PAGE_SLUG ) ),
-			esc_html__( 'Open image optimization', 'kilobyte-image-optimizer' ),
-			esc_html__( 'Technical details', 'kilobyte-image-optimizer' ),
-			esc_html( $error->get_error_message() )
+			esc_html__( 'Open image optimization', 'kilobyte-image-optimizer' )
 		);
 	}
 

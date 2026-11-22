@@ -22,4 +22,13 @@ interface VariantRetirementInterface {
 	 * @return bool
 	 */
 	public function retire( int $attachment_id, OptimizationRecord $record ): bool;
+
+	/**
+	 * Cancel any previously scheduled removal of the record's files.
+	 *
+	 * @param int                $attachment_id Attachment ID.
+	 * @param OptimizationRecord $record        Record owning the files.
+	 * @return bool
+	 */
+	public function preserve( int $attachment_id, OptimizationRecord $record ): bool;
 }

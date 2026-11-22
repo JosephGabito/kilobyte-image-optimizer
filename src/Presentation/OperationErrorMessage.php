@@ -26,11 +26,20 @@ final class OperationErrorMessage {
 		$reason                   = $failure->reason();
 		$errors                   = array(
 			OperationFailure::BUSY               => array( 409, __( 'WordPress could not lock this image for processing. Wait a moment and retry. If it keeps happening, ask your host to check database locks.', 'kilobyte-image-optimizer' ) ),
-			OperationFailure::MISSING_SOURCE     => array( 404, __( 'This image is unavailable or uses an unsupported format.', 'kilobyte-image-optimizer' ) ),
+			OperationFailure::MISSING_SOURCE     => array( 404, __( 'WordPress could not open the source file.', 'kilobyte-image-optimizer' ) ),
+			OperationFailure::INVALID_IMAGE      => array( 422, __( 'WordPress could not read this image.', 'kilobyte-image-optimizer' ) ),
+			OperationFailure::INVALID_MIME       => array( 415, __( 'This site cannot process this image format. Try WebP, JPEG, or PNG.', 'kilobyte-image-optimizer' ) ),
+			OperationFailure::ANIMATED_IMAGE     => array( 422, __( 'This image contains animation. Use a still image or keep the original.', 'kilobyte-image-optimizer' ) ),
+			OperationFailure::IMAGE_TOO_LARGE    => array( 422, __( 'This image exceeds the image processing limit. Try a smaller version.', 'kilobyte-image-optimizer' ) ),
+			OperationFailure::SERVER_IMAGE_LIMIT => array( 422, __( 'The server has too little memory to process this image. Try a smaller version or ask your host about the PHP memory limit.', 'kilobyte-image-optimizer' ) ),
+			OperationFailure::UPLOAD_TOO_LARGE   => array( 413, __( 'The optimized copy exceeds the site upload limit. Try a smaller copy or optimize with your site settings.', 'kilobyte-image-optimizer' ) ),
+			OperationFailure::MISSING_FILE       => array( 400, __( 'WordPress did not receive the optimized copy. Try saving it again.', 'kilobyte-image-optimizer' ) ),
+			OperationFailure::UPLOAD_FAILED      => array( 400, __( 'WordPress could not receive the whole optimized copy. Try again or ask your host to check uploads.', 'kilobyte-image-optimizer' ) ),
 			OperationFailure::SOURCE_CHANGED     => array( 409, __( 'The source image could not be matched to the browser copy. Open the image again or optimize with your site settings.', 'kilobyte-image-optimizer' ) ),
 			OperationFailure::ORIGINAL_MISSING   => array( 409, __( 'WordPress could not verify the original. The optimized copy was kept. Recover the original or ask your host to check that WordPress can open it, then try again.', 'kilobyte-image-optimizer' ) ),
 			OperationFailure::NO_BACKUP          => array( 404, __( 'There is no original to restore for this image.', 'kilobyte-image-optimizer' ) ),
 			OperationFailure::MISSING_BACKUP     => array( 404, __( 'The original backup file is missing.', 'kilobyte-image-optimizer' ) ),
+			OperationFailure::BACKUP_UNVERIFIED  => array( 422, __( 'WordPress could not verify the original backup. It kept the current image. Recover an intact backup or ask your host to check image processing limits, then retry.', 'kilobyte-image-optimizer' ) ),
 			OperationFailure::ENCODE_FAILED      => array( 422, __( 'The server could not compress this image.', 'kilobyte-image-optimizer' ) ),
 			OperationFailure::WRITE_FAILED       => array( 500, __( 'Could not save the optimized copy.', 'kilobyte-image-optimizer' ) ),
 			OperationFailure::RESTORE_FAILED     => array( 500, __( 'Could not finish restoring this image. Try again.', 'kilobyte-image-optimizer' ) ),
@@ -38,6 +47,8 @@ final class OperationErrorMessage {
 			OperationFailure::BACKUPS_PROTECTED  => array( 409, __( 'The legacy backup folder still contains files. Recover any remaining originals and archive the kilobyte-backups folder before clearing its references.', 'kilobyte-image-optimizer' ) ),
 			OperationFailure::PURGE_FAILED       => array( 500, __( 'Could not clear the legacy backup references. Check that WordPress can read its uploads folder and save settings, then retry.', 'kilobyte-image-optimizer' ) ),
 			OperationFailure::REGEN_FAILED       => array( 422, __( 'Could not regenerate all thumbnails. Check that WordPress can open the image and write to its uploads folder, then retry.', 'kilobyte-image-optimizer' ) ),
+			OperationFailure::JOB_NOT_QUEUED     => array( 503, __( 'WordPress could not schedule optimization. Optimize the image manually or ask your host to check scheduled tasks.', 'kilobyte-image-optimizer' ) ),
+			OperationFailure::JOB_INTERRUPTED    => array( 503, __( 'Background optimization was interrupted. Optimize the image manually or ask your host to check image processing limits.', 'kilobyte-image-optimizer' ) ),
 		);
 		list( $status, $message ) = $errors[ $reason ] ?? $errors[ OperationFailure::WRITE_FAILED ];
 		return new WP_Error(

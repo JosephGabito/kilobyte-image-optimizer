@@ -1,6 +1,6 @@
 import apiFetch from '@wordpress/api-fetch';
 import { __, sprintf } from '@wordpress/i18n';
-import { toFriendlyError } from '../../domain/errors';
+import { canUseServerAfterBrowserSave, OptimizationFallbackError, toFriendlyError } from '../../domain/errors';
 import { isSupportedMime } from '../../domain/format';
 import type { OptimizeResponse, UploadBootstrapConfig } from '../../domain/types';
 import { browserCompressor } from '../../infrastructure/browserCompressor';
@@ -195,10 +195,15 @@ function installUploadMiddleware( config: UploadBootstrapConfig ): void {
 					report( await wpRestClient.uploadOptimized( id, result.file, result.filename, { sourceHash: result.sourceHash } ) );
 					return;
 				} catch ( error ) {
-					const code = ( error as { code?: string } )?.code;
-					if ( code !== 'kilobyte_io_invalid_mime' && code !== 'kilobyte_io_invalid_image' && code !== 'kilobyte_io_source_changed' ) {
+					if ( ! canUseServerAfterBrowserSave( error ) ) {
 						throw error;
 					}
+					try {
+						report( await wpRestClient.optimizeOnServer( id ) );
+					} catch ( serverError ) {
+						throw new OptimizationFallbackError( error, serverError );
+					}
+					return;
 				}
 			}
 			report( await wpRestClient.optimizeOnServer( id ) );

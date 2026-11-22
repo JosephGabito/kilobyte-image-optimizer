@@ -11,6 +11,7 @@ namespace Kilobyte\ImageOptimizer\Application;
 
 use Kilobyte\ImageOptimizer\Domain\Repository\AttachmentRepositoryInterface;
 use Kilobyte\ImageOptimizer\Domain\Repository\OptimizationEventsInterface;
+use Kilobyte\ImageOptimizer\Domain\Repository\VariantRetirementInterface;
 use Kilobyte\ImageOptimizer\Domain\ValueObject\ImageFormat;
 use Kilobyte\ImageOptimizer\Domain\ValueObject\OptimizationRecord;
 use Kilobyte\ImageOptimizer\Domain\ValueObject\OptimizationSettings;
@@ -31,13 +32,18 @@ final class SaveOptimizedVariant {
 	/** @var OptimizationEventsInterface */
 	private OptimizationEventsInterface $events;
 
+	/** @var VariantRetirementInterface */
+	private VariantRetirementInterface $retirement;
+
 	/**
 	 * @param AttachmentRepositoryInterface $attachments Attachment repository.
-	@param OptimizationEventsInterface    $events Integration events.
+	 * @param OptimizationEventsInterface    $events      Integration events.
+	 * @param VariantRetirementInterface     $retirement  Deferred cleanup of replaced copies.
 	 */
-	public function __construct( AttachmentRepositoryInterface $attachments, OptimizationEventsInterface $events ) {
+	public function __construct( AttachmentRepositoryInterface $attachments, OptimizationEventsInterface $events, VariantRetirementInterface $retirement ) {
 		$this->attachments = $attachments;
 		$this->events      = $events;
+		$this->retirement  = $retirement;
 	}
 
 	/**
@@ -76,11 +82,11 @@ final class SaveOptimizedVariant {
 			$variant['thumbnail_stamps']
 		);
 		if ( ! $this->source_is_current( $image ) ) {
-			$this->attachments->delete_sibling_variant( $id, $record );
+			$this->attachments->discard_sibling_variant( $id, $record );
 			return new OperationFailure( OperationFailure::SOURCE_CHANGED );
 		}
-		if ( ! $this->attachments->save_record( $id, $record ) ) {
-			$this->attachments->delete_sibling_variant( $id, $record );
+		if ( ! $this->save_record( $id, $record, $image['source_hash'] ?? '' ) ) {
+			$this->attachments->discard_sibling_variant( $id, $record );
 			return new OperationFailure( OperationFailure::WRITE_FAILED );
 		}
 
@@ -129,7 +135,7 @@ final class SaveOptimizedVariant {
 			array(),
 			$image['source_revision']
 		);
-		if ( ! $this->attachments->save_record( $id, $record ) ) {
+		if ( ! $this->save_record( $id, $record, $image['source_hash'] ?? '' ) ) {
 			return new OperationFailure( OperationFailure::WRITE_FAILED );
 		}
 		return array(
@@ -137,6 +143,33 @@ final class SaveOptimizedVariant {
 			'skipped' => true,
 			'status'  => $status,
 		);
+	}
+
+	/**
+	 * Preserve previous copies while updating the delivery record for an edited image.
+	 *
+	 * @param int                $id          Attachment ID.
+	 * @param OptimizationRecord $record      New outcome.
+	 * @param string             $source_hash Current original checksum.
+	 * @return bool
+	 */
+	private function save_record( int $id, OptimizationRecord $record, string $source_hash ): bool {
+		$previous   = $this->attachments->get_record( $id );
+		$had_copy   = null !== $previous && $previous->is_sibling();
+		$may_retire = $had_copy && $previous->matches_source_hash( $source_hash );
+		if ( $had_copy && ! $may_retire && ! $this->retirement->preserve( $id, $previous ) ) {
+			return false;
+		}
+		if ( ! $this->attachments->save_record( $id, $record ) ) {
+			return false;
+		}
+		if ( $may_retire ) {
+			$this->retirement->retire( $id, $previous );
+		}
+		if ( $had_copy && $record->is_unchanged() ) {
+			$this->events->variant_changed( $id );
+		}
+		return true;
 	}
 
 	/**
