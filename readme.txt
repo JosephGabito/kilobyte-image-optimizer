@@ -29,18 +29,21 @@ We care about your experience because we are WordPress users too. Kilobyte is de
 
 = Key Features =
 
-* **Automatic image compression on upload** makes smaller copies of supported images after WordPress saves the original. Scheduled tasks handle classic, mobile app, and server-managed REST uploads. They can also finish an interrupted Kilobyte browser job after the original is saved. WordPress's native browser uploader queues optimization after it finishes preparing the media.
-* **Unlimited Free Image Optimization:** Optimize images across your entire Media Library with zero monthly quotas or thumbnail credit caps.
+* **Unlimited free image optimization** across your entire Media Library with no account, API key, monthly quota, or thumbnail credit cap.
+* **Automatic image compression on upload** makes smaller copies of supported images after WordPress saves the original. Scheduled tasks handle classic, mobile app, and server-managed REST uploads, and can also finish an interrupted Kilobyte browser job after the original is saved. WordPress's native browser uploader queues optimization after it finishes preparing the media.
 * **Live quality preview & single optimize** lets you compare compression side by side on a supported photo from your Media Library or computer. Switch formats and presets live, then use **Optimize now** for a Media Library image or **Download copy** for a local file.
-* **Selective optimize:** Pick specific Media Library photos to optimize a single post, landing page, or gallery without running a full bulk job.
-* **Bulk image optimization** shows a live ETA and lets you resume stopped jobs or retry failed images while the tab stays open.
-* **WebP converter & AVIF converter:** Convert JPEG, PNG, BMP, and static GIF images to WebP or AVIF while automatically detecting and leaving animated GIFs, APNGs, and animated WebPs untouched.
-* **Browser-first processing + server fallback** uses your browser when possible and WordPress's image editor (Imagick or GD) when needed. Uploads that WordPress handles on its own can queue a copy for background optimization after saving the original.
-* **Non-destructive originals and one-click restore** keep Media Library files in place and serve smaller copies with fallback to the original. Restore a single image or use **Restore all**.
-* **Resize optimized copies** to your maximum width and height. WordPress keeps the uploaded original.
+* **Selective optimize** lets you multi-select specific Media Library photos (paginated for large selections) to optimize a single post, landing page, or gallery without running a full bulk job.
+* **Bulk image optimization** processes your Media Library with a live ETA, reload protection, per-reason skip totals, links to unavailable Media Library entries, and resume/retry for stopped or failed images while the tab stays open.
+* **WebP & AVIF conversion + static GIF support** converts JPEG, PNG, BMP, and static GIF images to WebP or AVIF while automatically detecting and preserving animated GIFs, APNGs, and animated WebPs.
+* **Browser-first processing + server fallback** runs compression off the main thread in a browser Web Worker when possible (no `exec()` required) and falls back to WordPress's built-in image editor (Imagick or GD) when needed.
+* **Non-destructive originals & one-click restore** keep Media Library files and existing URLs in place, serve smaller copies via `<picture>` with fallback to the original, and let you restore a single image (from the Media Library list or media modal) or use **Restore all**.
+* **Cache-safe 24-hour deferred cleanup** keeps retired copies available for at least 24 hours so cached pages never break, cleans up eligible copies in bounded background batches, and preserves recovery state across reinstalls.
+* **Resize optimized copies** to your maximum width and height while WordPress keeps the uploaded original untouched.
 * **Regenerate thumbnails** to rebuild registered WordPress image sizes. Identical thumbnails reuse the existing files, and previous thumbnail URLs stay available.
-* **Optional auto alt text and image decoding hints** can fill empty alt text from filenames on upload and hint to browsers how to decode photos.
-* **WP-CLI & developer hooks:** Supports `wp kilobyte optimize`, `wp kilobyte restore`, `wp kilobyte stats`, and `wp kilobyte purge-backups`, plus `kilobyte_io_variant_filename` for custom variant naming and `kilobyte_io_variant_changed` for page-cache invalidation.
+* **Copyable optimization summary** lets you copy a plain-text report of optimized counts, estimated transfer savings, and active format in one click.
+* **Optional auto alt text & image decoding hints** can fill empty alt text from filenames on upload and hint to browsers how to decode photos.
+* **Per-attachment permissions & multisite awareness** enforces WordPress `edit_post` permissions across REST routes and Media Library controls and scopes network lifecycle operations cleanly per site.
+* **WP-CLI & developer hooks** support `wp kilobyte optimize`, `wp kilobyte restore`, `wp kilobyte stats` (`--reconcile`), and `wp kilobyte purge-backups`, plus `kilobyte_io_settings`, `kilobyte_io_should_optimize`, `kilobyte_io_after_optimize`, `kilobyte_io_variant_filename`, and `kilobyte_io_variant_changed`.
 
 = How Originals & Delivery Work =
 
@@ -57,6 +60,14 @@ Supported images in posts and featured images serve the smaller WebP or AVIF cop
 = Where are my images processed? =
 
 Processing uses your browser or WordPress site. Kilobyte uses no compression service and requires no account or API key. When your site serves media through a CDN, the browser requests the configured media URLs.
+
+= How does Kilobyte compress images, and which PHP extensions do I need? =
+
+Kilobyte uses JavaScript and the browser's built-in Canvas API to resize images and encode copies. When supported, it runs this in a background Web Worker using `OffscreenCanvas`. Files you pick from your computer in **Preview** stay on your device.
+
+The plugin requires WordPress 6.6 or newer and PHP 7.4 or newer. Saving optimized copies to the Media Library, compressing on the server, and regenerating thumbnails require a working WordPress image editor. On most hosts, either the **GD** or **Imagick** PHP extension provides it. WebP and AVIF are available on your site when WordPress allows the format and your host's image editor supports it. The optional **EXIF** extension helps WordPress read camera metadata such as JPEG orientation.
+
+Check **Tools > Site Health > Info > Media Handling** to see your site's active image editor and supported formats.
 
 = What if my browser or site does not support AVIF? =
 

@@ -15,16 +15,25 @@ We care about your experience because we are WordPress users too. Kilobyte is de
 
 ## Key Features
 
-- **Automatic image compression on upload:** Creates smaller copies of supported images right after WordPress saves the original — using your browser for Gutenberg and Media Library uploads, or WordPress scheduled tasks for classic, mobile app, and server-handled REST uploads.
-- **Live quality preview & single optimize:** Compare compression side by side on any photo from your Media Library or computer, switch formats and presets live, and save a single image with **Optimize now** (or **Download copy** for local files).
+- **Unlimited free image optimization:** Optimize your entire Media Library with no account, API key, monthly quota, or thumbnail credit cap.
+- **Automatic image compression on upload:** Creates smaller copies of supported images right after WordPress saves the original — using your browser for Gutenberg and Media Library uploads, or WordPress scheduled background tasks for classic, mobile app, and server-handled REST uploads.
+- **Live quality preview & single optimize:** Compare compression side by side on any photo from your Media Library or computer, switch formats (WebP, AVIF, Original) and compression presets (High detail, Balanced, Smallest files) live, and save immediately with **Optimize now** (or **Download copy** for local files).
 - **Selective optimize:** Multi-select specific Media Library photos (paginated for large selections) to optimize a single post, landing page, or gallery without running a full bulk job.
-- **Bulk image optimizer:** Optimize your entire Media Library with resumable pagination, live ETA, reload protection, and one-click retry for failed items.
-- **WebP & AVIF converter + static GIF support:** Converts JPEG, PNG, BMP, and static GIF images to WebP or AVIF while automatically detecting and leaving animated GIFs, APNGs, and animated WebPs untouched.
-- **Non-destructive originals & 1-click restore:** Keeps original Media Library files in place, serves smaller copies via `<picture>` with automatic fallback, and lets you restore a single image or **Restore all**.
-- **Resize optimized copies, regenerate thumbnails & optional hints:** Scale down oversized copies, rebuild registered WordPress thumbnail sizes safely, fill empty alt text from filenames, and add image decoding hints.
+- **Bulk image optimizer:** Process your entire Media Library with resumable pagination, live ETA, reload protection, per-reason skip totals, links to unavailable Media Library entries, and one-click retry for failed items.
+- **WebP & AVIF converter + static GIF support:** Converts JPEG, PNG, BMP, and static GIF images to WebP or AVIF while automatically detecting and preserving animated GIFs, APNGs, and animated WebPs.
+- **Browser Web Worker + automatic server fallback:** Runs compression off the main thread in your browser without requiring `exec()`, and falls back automatically to WordPress's built-in image editor (Imagick or GD) when needed.
+- **Non-destructive originals & 1-click restore:** Keeps original Media Library files and existing URLs in place, serves smaller copies via `<picture>` with automatic fallback, and lets you restore a single image from the Media Library (list view or media modal) or choose **Restore all**.
+- **Cache-safe 24-hour deferred cleanup:** Keeps retired copies available for at least 24 hours so cached pages never break, then cleans up eligible copies in bounded background batches while preserving recovery state across reinstalls.
+- **Resize optimized copies:** Scale down oversized copies to your maximum width and height while leaving the uploaded original untouched.
+- **Regenerate thumbnails:** Rebuild registered WordPress thumbnail sizes without breaking existing thumbnail or original URLs.
+- **Copyable optimization summary:** Copy a plain-text summary of optimized counts, estimated transfer savings, and active format in one click.
+- **Optional auto alt text & image decoding hints:** Fill empty alt text cleanly from attachment filenames on upload and add browser image decoding hints.
+- **Per-attachment permissions & multisite awareness:** Enforces WordPress `edit_post` permissions across REST routes and Media Library controls and scopes network lifecycle operations per site.
 - **WP-CLI & developer hooks:**
-  - `wp kilobyte optimize`, `wp kilobyte restore`, `wp kilobyte stats`, `wp kilobyte purge-backups`
-  - `kilobyte_io_variant_filename` — filter generated variant filenames
+  - `wp kilobyte optimize`, `wp kilobyte restore`, `wp kilobyte stats` (`--reconcile`), `wp kilobyte purge-backups`
+  - `kilobyte_io_settings` — filter active plugin preferences
+  - `kilobyte_io_should_optimize` / `kilobyte_io_after_optimize` — control and react to optimization
+  - `kilobyte_io_variant_filename` — customize generated variant filenames
   - `kilobyte_io_variant_changed` — action fired on create/restore for page-cache invalidation
 
 ## Requirements
