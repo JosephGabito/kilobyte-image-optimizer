@@ -1,5 +1,5 @@
 === Kilobyte Image Optimizer ===
-Contributors: josephgabito
+Contributors: dunhakdis
 Tags: image-optimization, compress-images, optimize-images, webp, avif
 Requires at least: 6.6
 Tested up to: 7.1
