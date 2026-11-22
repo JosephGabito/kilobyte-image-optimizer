@@ -77,10 +77,12 @@ final class RestoreAttachmentUseCase {
 				}
 
 				if ( $record->is_sibling() ) {
-					if ( ! $this->attachments->has_readable_original( $attachment_id ) ) {
+					$readable = $this->attachments->has_readable_original( $attachment_id );
+					if ( ! $readable && ! $this->attachments->has_animated_gif_original( $attachment_id ) ) {
 						return new OperationFailure( OperationFailure::ORIGINAL_MISSING );
 					}
-					if ( ! $this->retirement->retire( $attachment_id, $record ) || ! $this->attachments->delete_record( $attachment_id ) ) {
+					// A structurally complete animation can be re-enabled without retiring a usable copy.
+					if ( ( $readable && ! $this->retirement->retire( $attachment_id, $record ) ) || ! $this->attachments->delete_record( $attachment_id ) ) {
 						return new OperationFailure( OperationFailure::RESTORE_FAILED );
 					}
 					$this->events->variant_changed( $attachment_id );

@@ -7,7 +7,6 @@ import {
 	CardFooter,
 	CardHeader,
 	Icon,
-	ProgressBar,
 	__experimentalHStack as HStack,
 	__experimentalHeading as Heading,
 	__experimentalSpacer as Spacer,
@@ -17,7 +16,6 @@ import {
 } from '@wordpress/components';
 import { check, copy, image, undo, update } from '@wordpress/icons';
 import { toFriendlyError, type FriendlyError } from '../../../domain/errors';
-import { formatBytes } from '../../../domain/format';
 import { buildClientSummary } from '../../../domain/presets';
 import {
 	getPrimaryOptimizeLabel,
@@ -25,6 +23,7 @@ import {
 	type RunSummary,
 } from '../../../domain/session';
 import { ActivityList } from './ActivityList';
+import { QueueProgress } from './QueueProgress';
 import { GuidanceBanner } from './GuidanceBanner';
 import type {
 	BrowserSupport,
@@ -36,6 +35,7 @@ import type {
 } from '../../../domain/types';
 
 interface BulkOptimizerCardProps {
+	disabled?: boolean;
 	stats: LibraryStats | null;
 	support: BrowserSupport | null;
 	format: OutputFormat;
@@ -43,6 +43,7 @@ interface BulkOptimizerCardProps {
 	phase: BulkPhase;
 	activeMode: QueueMode | null;
 	failedCount: number;
+	hasMore: boolean;
 	lastSummary: RunSummary | null;
 	stopping: boolean;
 	progress: BulkProgress | null;
@@ -55,6 +56,7 @@ interface BulkOptimizerCardProps {
 }
 
 export function BulkOptimizerCard( {
+	disabled = false,
 	stats,
 	support,
 	format,
@@ -62,6 +64,7 @@ export function BulkOptimizerCard( {
 	phase,
 	activeMode,
 	failedCount,
+	hasMore,
 	lastSummary,
 	stopping,
 	progress,
@@ -75,13 +78,10 @@ export function BulkOptimizerCard( {
 	const [ copied, setCopied ] = useState( false );
 	const [ copyError, setCopyError ] = useState< FriendlyError | null >( null );
 	const running = activeMode !== null;
-	const isRetryState = ( phase === 'completed_with_errors' || phase === 'stopped' ) && failedCount > 0;
-	const primaryLabel = getPrimaryOptimizeLabel( ! isRetryState && phase === 'stopped' && lastSummary?.mode !== 'optimize' ? 'idle' : phase, activeMode, failedCount );
-
-	const progressPercent =
-		progress && progress.total > 0
-			? Math.round( ( progress.done / progress.total ) * 100 )
-			: 0;
+	const isRetryState = ( phase === 'completed_with_errors' || phase === 'stopped' ) && ( failedCount > 0 || hasMore );
+	const primaryLabel = isRetryState && ( phase === 'stopped' || hasMore )
+		? __( 'Continue processing images', 'kilobyte-image-optimizer' )
+		: getPrimaryOptimizeLabel( ! isRetryState && phase === 'stopped' ? 'idle' : phase, activeMode, failedCount );
 
 	const handleCopySummary = async () => {
 		if ( ! stats ) {
@@ -143,7 +143,7 @@ export function BulkOptimizerCard( {
 							icon={ isRetryState ? update : image }
 							isBusy={ activeMode === 'optimize' }
 							disabled={
-								running ||
+								disabled || running ||
 								( ! isRetryState && stats !== null && stats.remaining_count === 0 )
 							}
 							onClick={ () => ( isRetryState ? onRetryFailed() : onStart( 'optimize' ) ) }
@@ -156,7 +156,7 @@ export function BulkOptimizerCard( {
 							size="compact"
 							icon={ update }
 							isBusy={ activeMode === 'regenerate' }
-							disabled={ running }
+							disabled={ disabled || running }
 							onClick={ () => onStart( 'regenerate' ) }
 						>
 							{ activeMode === 'regenerate'
@@ -180,59 +180,7 @@ export function BulkOptimizerCard( {
 						) }
 					</HStack>
 
-					{ progress && (
-						<Surface variant="secondary">
-							<Spacer padding={ 3 }>
-								<VStack spacing={ 2 }>
-									<HStack justify="space-between" wrap>
-										<Text size={ 13 } weight={ 600 }>
-											{ progress.currentFile
-												? `${ progress.stage }: ${ progress.currentFile }`
-												: progress.stage }
-										</Text>
-										<Text size={ 12 } variant="muted">
-											{ progress.total > 0
-												? `${ progress.done } of ${ progress.total } (${ progressPercent }%)`
-												: '' }
-										</Text>
-									</HStack>
-
-									{ progress.download && (
-										<Text size={ 12 } variant="muted">
-											{ sprintf(
-												/* translators: %s: amount of image data downloaded. */
-												__( '%s loaded', 'kilobyte-image-optimizer' ),
-												formatBytes( progress.download.loaded )
-											) }
-										</Text>
-									) }
-									<ProgressBar
-										value={ progress.download
-											? ( progress.download.total > 0 ? Math.min( 100, 100 * progress.download.loaded / progress.download.total ) : undefined )
-											: ( progress.total > 0 ? progressPercent : undefined ) }
-									/>
-
-									<HStack justify="space-between" wrap>
-										<Text size={ 12 } variant="muted">
-											{ sprintf(
-												/* translators: %d: elapsed seconds. */
-												__( '%ds elapsed', 'kilobyte-image-optimizer' ), elapsedSeconds
-											) }
-											{ progress.eta ? ` · ${ progress.eta }` : '' }
-										</Text>
-										{ running && (
-											<Text size={ 12 } weight={ 500 }>
-												{ __(
-													'Keep this tab open and do not reload until finished.',
-													'kilobyte-image-optimizer'
-												) }
-											</Text>
-										) }
-									</HStack>
-								</VStack>
-							</Spacer>
-						</Surface>
-					) }
+					{ progress && <QueueProgress progress={ progress } elapsedSeconds={ elapsedSeconds } /> }
 
 					{ ! running && lastSummary && (
 						<Surface variant="secondary">
@@ -291,7 +239,7 @@ export function BulkOptimizerCard( {
 								size="compact"
 								icon={ undo }
 								isBusy={ activeMode === 'restore' }
-								disabled={ running }
+								disabled={ disabled || running }
 								onClick={ onRequestRestore }
 							>
 								{ activeMode === 'restore'

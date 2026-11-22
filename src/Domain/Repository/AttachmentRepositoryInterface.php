@@ -20,16 +20,32 @@ interface AttachmentRepositoryInterface {
 	/**
 	 * Return attachment metadata needed for processing, or null if invalid/missing on disk.
 	 *
-	 * @param int $attachment_id Attachment ID.
+	 * @param int  $attachment_id Attachment ID.
+	 * @param bool $for_encoding Capture a source revision before creating a copy.
 	 * @return array<string, mixed>|null
 	 */
-	public function find_image( int $attachment_id ): ?array;
+	public function find_image( int $attachment_id, bool $for_encoding = false ): ?array;
+
+	/**
+	 * Check for animation before publishing a still copy.
+	 *
+	 * @param string $file Validated local source path.
+	 * @param string $mime Source MIME type.
+	 * @return bool
+	 */
+	public function source_is_animated( string $file, string $mime ): bool;
 
 	/**
 	 * @param int $attachment_id Attachment ID.
 	 * @return bool Whether an original is present and readable.
 	 */
 	public function has_readable_original( int $attachment_id ): bool;
+
+	/**
+	 * @param int $attachment_id Attachment ID.
+	 * @return bool Whether the attachment is a structurally complete animated GIF.
+	 */
+	public function has_animated_gif_original( int $attachment_id ): bool;
 
 	/**
 	 * Retrieve an attachment's optimization record, if present.

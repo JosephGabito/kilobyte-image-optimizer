@@ -34,6 +34,10 @@ Processing uses your browser or WordPress site. Kilobyte uses no compression ser
 
 Kilobyte can fall back to WebP or use your WordPress site's image editor. Format availability depends on your browser, server, and site settings. Oversized, unreadable, or unsupported images may be skipped.
 
+= Can I optimize GIFs? =
+
+Kilobyte can make WebP or AVIF copies of still GIFs. Animated GIFs keep their animation. Choose Original in the format settings to keep GIF files as they are.
+
 = What happens to images served from a CDN or offloaded storage? =
 
 Kilobyte works with locally available uploads. When a CDN or offload plugin changes an attachment's URL, Kilobyte leaves its existing output in place. Browser bulk jobs can use the server fallback if an image is available locally.

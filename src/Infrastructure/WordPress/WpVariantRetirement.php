@@ -43,9 +43,9 @@ final class WpVariantRetirement implements VariantRetirementInterface {
 		if ( ! $record->variants() ) {
 			return true;
 		}
-		$paths = $this->attachments->variant_paths( $attachment_id, $record );
+		$paths = array_filter( $this->attachments->variant_paths( $attachment_id, $record ), array( $this->attachments, 'is_owned_variant_path' ) );
 		if ( empty( $paths ) ) {
-			return false;
+			return true;
 		}
 
 		if ( ! wp_next_scheduled( self::EVENT ) && ! wp_schedule_event( time() + HOUR_IN_SECONDS, 'hourly', self::EVENT ) && ! wp_next_scheduled( self::EVENT ) ) {
@@ -123,6 +123,10 @@ final class WpVariantRetirement implements VariantRetirementInterface {
 					$can_clean = null;
 					$protected = null;
 					foreach ( $pending as $file => $due ) {
+						if ( ! $this->attachments->is_owned_variant_path( $file ) ) {
+							unset( $pending[ $file ] );
+							continue;
+						}
 						if ( $due > $now ) {
 							continue;
 						}

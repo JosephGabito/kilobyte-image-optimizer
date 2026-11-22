@@ -348,6 +348,7 @@ final class OptimizerRestController {
 		}
 
 		if ( ! WpRasterImage::is_bounded( $tmp_path, $detected_mime, true )
+			|| WpRasterImage::is_animated( $tmp_path, $detected_mime )
 			|| is_wp_error( wp_get_image_editor( $tmp_path, array( 'mime_type' => $detected_mime ) ) )
 		) {
 			return new WP_Error(
@@ -357,7 +358,16 @@ final class OptimizerRestController {
 			);
 		}
 
-		$result = $this->optimize_browser->execute( $attachment_id, $tmp_path, $detected_mime, (int) wp_filesize( $tmp_path ) );
+		$params      = $request->get_body_params();
+		$source_hash = $params['source_hash'] ?? '';
+		$result      = $this->optimize_browser->execute(
+			$attachment_id,
+			$tmp_path,
+			$detected_mime,
+			(int) wp_filesize( $tmp_path ),
+			'1' === ( $params['preview'] ?? '' ),
+			is_string( $source_hash ) && preg_match( '/^[a-f0-9]{64}$/D', $source_hash ) ? $source_hash : ''
+		);
 
 		return $result instanceof OperationFailure ? OperationErrorMessage::to_wp_error( $result ) : rest_ensure_response( $result );
 	}

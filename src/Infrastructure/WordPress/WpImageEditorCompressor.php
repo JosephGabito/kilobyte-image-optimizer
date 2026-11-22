@@ -24,20 +24,27 @@ final class WpImageEditorCompressor implements ServerCompressorInterface {
 	 * @param string               $source_file Local source path.
 	 * @param string               $source_mime Source MIME.
 	 * @param OptimizationSettings $settings    Active settings.
-	 * @return array{tmp_path: string, mime: string, size: int}|array{error: string}
+	 * @return array{tmp_path: string, mime: string, size: int}|array{error: string}|array{skip_reason: string}
 	 */
 	public function compress_to_temp( string $source_file, string $source_mime, OptimizationSettings $settings ): array {
+		if ( 'image/gif' === $source_mime && ImageFormat::ORIGINAL === $settings->format()->value() ) {
+			return array( 'skip_reason' => 'original_format_kept' );
+		}
+
 		if ( ! WpRasterImage::is_bounded( $source_file, $source_mime ) ) {
 			return array( 'error' => __( 'The image is unreadable or exceeds the server image size limit.', 'kilobyte-image-optimizer' ) );
 		}
 
 		if ( WpRasterImage::is_animated( $source_file, $source_mime ) ) {
-			return array( 'error' => __( 'This image contains animation that the server cannot preserve.', 'kilobyte-image-optimizer' ) );
+			return array( 'skip_reason' => 'animated' );
 		}
 
 		$editor = wp_get_image_editor( $source_file );
 		if ( is_wp_error( $editor ) ) {
 			return array( 'error' => $editor->get_error_message() );
+		}
+		if ( 'image/gif' === $source_mime && ! WpRasterImage::prepare_still_gif( $source_file, $editor ) ) {
+			return array( 'skip_reason' => 'gif_canvas_kept' );
 		}
 
 		$mime = $this->target_mime( $source_mime, $settings, $editor );
@@ -78,6 +85,7 @@ final class WpImageEditorCompressor implements ServerCompressorInterface {
 		if ( '' === $path || dirname( $path ) !== dirname( $tmp_file )
 			|| pathinfo( $path, PATHINFO_FILENAME ) !== pathinfo( $tmp_file, PATHINFO_FILENAME )
 			|| ! ImageFormat::is_allowed_output_mime( $actual_mime ) || ! in_array( $actual_mime, get_allowed_mime_types(), true )
+			|| ( 'image/gif' === $source_mime && ! in_array( $actual_mime, array( 'image/webp', 'image/avif' ), true ) )
 			|| ! WpRasterImage::is_bounded( $path, $actual_mime )
 		) {
 			if ( '' !== $path && dirname( $path ) === dirname( $tmp_file ) && pathinfo( $path, PATHINFO_FILENAME ) === pathinfo( $tmp_file, PATHINFO_FILENAME ) ) {

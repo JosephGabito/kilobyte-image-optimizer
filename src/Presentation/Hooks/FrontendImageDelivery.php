@@ -147,7 +147,7 @@ final class FrontendImageDelivery {
 			$record               = $this->attachments->get_record( $attachment_id );
 			$url                  = wp_get_attachment_url( $attachment_id );
 			$this->paths[ $key ]  = $record && is_string( $url ) && 0 === strpos( $url, $base )
-				? $this->attachments->variant_paths( $attachment_id, $record )
+				? $this->attachments->delivery_variant_paths( $attachment_id, $record )
 				: array();
 			$this->widths[ $key ] = $record ? $record->variant_widths() : array();
 		}

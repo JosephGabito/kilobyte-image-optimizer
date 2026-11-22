@@ -11,7 +11,61 @@ export interface EncodeRequest {
 	quality: number;
 }
 
+function isStillGif( bytes: Uint8Array ): boolean {
+	const header = String.fromCharCode( ...bytes.subarray( 0, 6 ) );
+	if ( bytes.length < 13 || ( header !== 'GIF87a' && header !== 'GIF89a' ) ) {
+		return false;
+	}
+
+	const readSize = ( offset: number ) => bytes[ offset ] + bytes[ offset + 1 ] * 256;
+	const canvasWidth = readSize( 6 );
+	const canvasHeight = readSize( 8 );
+	if ( ! canvasWidth || ! canvasHeight || canvasWidth * canvasHeight > MAX_IMAGE_PIXELS ) {
+		return false;
+	}
+	const colorTableSize = ( flags: number ) => ( flags & 0x80 ) ? 3 * ( 2 << ( flags & 7 ) ) : 0;
+	let offset = 13 + colorTableSize( bytes[ 10 ] );
+	let frames = 0;
+	while ( offset < bytes.length ) {
+		const block = bytes[ offset++ ];
+		if ( block === 0x3b ) {
+			return frames === 1 && offset === bytes.length;
+		}
+		if ( block === 0x2c ) {
+			frames += 1;
+			if ( frames > 1 || offset + 9 >= bytes.length ) {
+				return false;
+			}
+			const width = readSize( offset + 4 );
+			const height = readSize( offset + 6 );
+			if ( ! width || ! height || readSize( offset ) + width > canvasWidth || readSize( offset + 2 ) + height > canvasHeight ) {
+				return false;
+			}
+			// Image descriptor, local color table, and LZW minimum code size.
+			offset += 10 + colorTableSize( bytes[ offset + 8 ] );
+		} else if ( block === 0x21 && bytes[ offset ] !== 0x01 ) {
+			offset += 1;
+		} else {
+			// Plain text is also a rendering block. Keep the original if present.
+			return false;
+		}
+
+		while ( offset < bytes.length ) {
+			const length = bytes[ offset++ ];
+			if ( length === 0 ) {
+				break;
+			}
+			offset += length;
+		}
+	}
+	return false;
+}
+
 export async function isAnimated( file: File ): Promise< boolean > {
+	if ( file.type === 'image/gif' ) {
+		return ! isStillGif( new Uint8Array( await file.arrayBuffer() ) );
+	}
+
 	if ( file.type === 'image/png' ) {
 		const bytes = new DataView( await file.arrayBuffer() );
 		for ( let offset = 8; offset + 12 <= bytes.byteLength; ) {
@@ -44,6 +98,12 @@ export async function encodeRaster(
 	const { file, maxWidth, maxHeight, mime, quality } = request;
 	const bitmap = await createImageBitmap( file );
 	try {
+		if ( file.type === 'image/gif' ) {
+			const canvas = new DataView( await file.slice( 6, 10 ).arrayBuffer() );
+			if ( bitmap.width !== canvas.getUint16( 0, true ) || bitmap.height !== canvas.getUint16( 2, true ) ) {
+				throw new Error( 'The browser could not read the whole GIF canvas.' );
+			}
+		}
 		if ( bitmap.width * bitmap.height > MAX_IMAGE_PIXELS ) {
 			throw new Error( 'image_too_large' );
 		}

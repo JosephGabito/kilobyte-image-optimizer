@@ -27,13 +27,17 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 	public const RECONCILE_OPTION      = 'kilobyte_io_stats_need_rebuild';
 	public const BACKUPS_PURGED_OPTION = 'kilobyte_io_backups_purged';
 
+	/** @var int Maximum GIF data read for delivery across this request. */
+	private int $gif_delivery_bytes_left = WpRasterImage::MAX_BYTES;
+
 	/**
 	 * Return attachment metadata needed for processing, or null if invalid/outside uploads/missing.
 	 *
-	 * @param int $attachment_id Attachment ID.
+	 * @param int  $attachment_id Attachment ID.
+	 * @param bool $for_encoding  Capture the GIF content fingerprint before publishing.
 	 * @return array<string, mixed>|null
 	 */
-	public function find_image( int $attachment_id ): ?array {
+	public function find_image( int $attachment_id, bool $for_encoding = false ): ?array {
 		if ( $attachment_id <= 0 || 'attachment' !== get_post_type( $attachment_id ) ) {
 			return null;
 		}
@@ -48,13 +52,86 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 		if ( ! is_string( $mime ) ) {
 			return null;
 		}
+		$source_hash = $for_encoding && 'image/gif' === $mime && $bytes <= WpRasterImage::MAX_BYTES ? $this->source_hash( $file ) : '';
 		return array(
-			'id'        => $attachment_id,
-			'file'      => $file,
-			'filename'  => wp_basename( $file ),
-			'mime_type' => $mime,
-			'file_size' => $bytes,
+			'id'              => $attachment_id,
+			'file'            => $file,
+			'filename'        => wp_basename( $file ),
+			'mime_type'       => $mime,
+			'file_size'       => $bytes,
+			'source_hash'     => $source_hash,
+			'source_revision' => '' !== $source_hash ? $this->source_stamp( $file ) . '|' . $source_hash : '',
 		);
+	}
+
+	/**
+	 * @param string $file Validated local source path.
+	 * @param string $mime Source MIME type.
+	 * @return bool
+	 */
+	public function source_is_animated( string $file, string $mime ): bool {
+		return WpRasterImage::is_animated( $file, $mime );
+	}
+
+	/**
+	 * @param int $attachment_id Attachment ID.
+	 * @return bool
+	 */
+	public function has_animated_gif_original( int $attachment_id ): bool {
+		$image = $this->find_image( $attachment_id );
+		return null !== $image && 'image/gif' === $image['mime_type'] && WpRasterImage::has_gif_animation( $image['file'] );
+	}
+
+	/**
+	 * Keep serving a GIF variant only while its original file remains the same.
+	 *
+	 * @param int                $attachment_id Attachment ID.
+	 * @param OptimizationRecord $record        Stored optimization.
+	 * @return array<string, string>
+	 */
+	public function delivery_variant_paths( int $attachment_id, OptimizationRecord $record ): array {
+		if ( '' !== $record->source_revision() || 'gif' === strtolower( pathinfo( $record->original_name(), PATHINFO_EXTENSION ) ) ) {
+			$file     = $this->resolve_safe_upload_file( get_attached_file( $attachment_id ) );
+			$revision = explode( '|', $record->source_revision(), 2 );
+			if ( null === $file || empty( $revision[0] ) || empty( $revision[1] ) || $this->source_stamp( $file ) !== $revision[0] ) {
+				return array();
+			}
+			$size = (int) wp_filesize( $file );
+			if ( $size <= 0 || $size > $this->gif_delivery_bytes_left ) {
+				return array();
+			}
+			$this->gif_delivery_bytes_left -= $size;
+			if ( $this->source_hash( $file ) !== $revision[1] ) {
+				return array();
+			}
+		}
+		return $this->variant_paths( $attachment_id, $record );
+	}
+
+	/**
+	 * Read inexpensive file attributes before doing a bounded content check.
+	 *
+	 * @param string $file Canonical local path.
+	 * @return string
+	 */
+	private function source_stamp( string $file ): string {
+		clearstatcache( true, $file );
+		// Core's filesystem wrapper exposes mtime but not inode or change time.
+		// phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+		$stats = @stat( $file );
+		return is_array( $stats ) ? implode( ':', array( $stats['ino'], $stats['size'], $stats['mtime'], $stats['ctime'] ) ) : '';
+	}
+
+	/**
+	 * Hash a bounded local image to detect replacements within the stat timestamp.
+	 *
+	 * @param string $file Canonical local path.
+	 * @return string
+	 */
+	private function source_hash( string $file ): string {
+		// The file may be moved by another media tool before the read.
+		// phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+		return (string) @hash_file( 'sha256', $file );
 	}
 
 	/**
@@ -342,8 +419,7 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 			return null;
 		}
 
-		$suffix  = '.kilobyte-' . $attachment_id . '-' . wp_generate_uuid4() . '.' . $target_ext;
-		$variant = $original . $suffix;
+		$variant = $this->build_variant_path( $original, $target_ext, $attachment_id, false );
 		if ( ! $this->publish_file( $filesystem, $source_tmp_path, $variant ) ) {
 			return null;
 		}
@@ -362,6 +438,9 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 			if ( is_wp_error( $editor ) || ! $editor->supports_mime_type( $target_mime ) ) {
 				continue;
 			}
+			if ( 'image/gif' === $source_mime && ! WpRasterImage::prepare_still_gif( $thumbnail, $editor ) ) {
+				continue;
+			}
 
 			$dimensions = $editor->get_size();
 			$max_width  = $settings->max_width();
@@ -376,7 +455,7 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 				}
 			}
 			$editor->set_quality( $settings->quality() );
-			$destination = $thumbnail . $suffix;
+			$destination = $this->build_variant_path( $thumbnail, $target_ext, $attachment_id, true );
 			if ( $filesystem->exists( $destination ) || is_link( $destination ) ) {
 				continue;
 			}
@@ -441,11 +520,25 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 
 		return array_filter(
 			$paths,
-			static function ( string $variant, $source ) use ( $record, $attachment_id ): bool {
-				if ( ! is_string( $source ) || validate_file( $source ) || validate_file( $variant ) || 0 === strpos( $variant, '/' ) ) {
+			function ( string $variant, $source ) use ( $record, $attachment_id ): bool {
+				if (
+					! is_string( $source )
+					|| $variant === $source
+					|| validate_file( $source )
+					|| validate_file( $variant )
+					|| 0 === strpos( $variant, '/' )
+					|| dirname( $variant ) !== dirname( $source )
+				) {
 					return false;
 				}
 				$ext = preg_quote( $record->format(), '~' );
+				if ( $this->is_owned_variant_path( $variant, $attachment_id ) && pathinfo( $variant, PATHINFO_EXTENSION ) === $record->format() ) {
+					return true;
+				}
+				// Keep serving earlier mapped copies with short names. Their ownership is ambiguous.
+				if ( 1 === preg_match( '~(?:^|/)[a-zA-Z0-9_-]+-[a-f0-9]{8}\.' . $ext . '$~D', $variant ) ) {
+					return true;
+				}
 				return 1 === preg_match( '~^' . preg_quote( $source, '~' ) . '(?:\.kilobyte-(?:' . $attachment_id . '-)?[a-f0-9-]{36})?\.' . $ext . '$~D', $variant );
 			},
 			ARRAY_FILTER_USE_BOTH
@@ -501,7 +594,7 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 	 * @return bool
 	 */
 	public function delete_sibling_variant( int $attachment_id, OptimizationRecord $record ): bool {
-		$paths = $this->variant_paths( $attachment_id, $record );
+		$paths = array_filter( $this->variant_paths( $attachment_id, $record ), array( $this, 'is_owned_variant_path' ) );
 		return ! empty( $paths ) && $this->delete_variant_files( $paths );
 	}
 
@@ -519,19 +612,114 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 		}
 
 		$removed = true;
+		$basedir = trailingslashit( wp_get_upload_dir()['basedir'] );
 		foreach ( $paths as $relative ) {
-			if ( ! is_string( $relative ) || validate_file( $relative ) || 0 === strpos( $relative, '/' )
-				|| ! preg_match( '/\.kilobyte-(?:\d+-)?[a-f0-9-]{36}\.(?:jpg|png|webp|avif)$/iD', $relative ) ) {
+			if ( ! $this->is_owned_variant_path( $relative ) ) {
 				$removed = false;
 				continue;
 			}
 			$file = $root . $relative;
-			if ( is_link( $file ) || ( $filesystem->exists( $file ) && ( null === $this->resolve_safe_upload_file( $file ) || ! $filesystem->delete( $file ) ) ) ) {
+			if ( ! $filesystem->exists( $file ) && ! is_link( $file ) ) {
+				continue;
+			}
+			if ( $this->has_current_attachment_reference( $relative, $file, $basedir . $relative ) ) {
+				continue;
+			}
+			if ( null === $this->resolve_safe_upload_file( $file ) || ! $filesystem->delete( $file ) ) {
 				$removed = false;
 			}
 		}
 
 		return $removed;
+	}
+
+	/**
+	 * An imported copy may now be the WordPress original for another attachment.
+	 *
+	 * @param string $relative Upload-relative file.
+	 * @param string $canonical Absolute canonical path.
+	 * @param string $configured Absolute path under WordPress's configured uploads directory.
+	 * @return bool Whether deletion must be skipped.
+	 */
+	private function has_current_attachment_reference( string $relative, string $canonical, string $configured ): bool {
+		global $wpdb;
+		// Check the current reference directly so URL filters and stale caches cannot hide it.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$reference = $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key = %s AND meta_value IN (%s, %s, %s) LIMIT 1",
+				'_wp_attached_file',
+				$relative,
+				$canonical,
+				$configured
+			)
+		);
+		return null !== $reference || '' !== $wpdb->last_error;
+	}
+
+	/**
+	 * Build a clean, collision-free sibling variant path in the same directory as the source image.
+	 *
+	 * @param string $source_path   Absolute path to the source image or thumbnail.
+	 * @param string $target_ext    Target file extension.
+	 * @param int    $attachment_id Attachment ID.
+	 * @param bool   $is_thumbnail  Whether the source is a registered sub-size.
+	 * @return string
+	 */
+	private function build_variant_path(
+		string $source_path,
+		string $target_ext,
+		int $attachment_id,
+		bool $is_thumbnail
+	): string {
+		$source_stem = (string) pathinfo( $source_path, PATHINFO_FILENAME );
+		$token       = wp_generate_uuid4();
+
+		/**
+		 * Filter the base filename (without extension) for a generated optimized variant.
+		 *
+		 * Kilobyte appends its own attachment ID and a version token for each copy.
+		 *
+		 * @param string               $stem    Source filename without its extension.
+		 * @param array<string, mixed> $context Attachment and variant context.
+		 */
+		$filtered = apply_filters(
+			'kilobyte_io_variant_filename',
+			$source_stem,
+			array(
+				'attachment_id' => $attachment_id,
+				'source_stem'   => $source_stem,
+				'token'         => $token,
+				'extension'     => $target_ext,
+				'is_thumbnail'  => $is_thumbnail,
+			)
+		);
+
+		$normalize = static function ( string $stem ): string {
+			return trim( (string) preg_replace( '/[^a-zA-Z0-9_-]+/', '-', remove_accents( $stem ) ), '-' );
+		};
+		$stem      = is_string( $filtered ) ? $normalize( $filtered ) : '';
+		if ( '' === $stem ) {
+			$stem = $normalize( $source_stem );
+		}
+		$stem = '' !== $stem ? substr( $stem, 0, 175 ) : 'image';
+
+		return trailingslashit( dirname( $source_path ) ) . $stem . '.kilobyte-' . $attachment_id . '-' . $token . '.' . $target_ext;
+	}
+
+	/**
+	 * Confirm a relative upload path matches a Kilobyte-generated variant filename.
+	 *
+	 * @param mixed    $relative      Relative path under uploads.
+	 * @param int|null $attachment_id Require the marker to match a specific attachment.
+	 * @return bool
+	 */
+	public function is_owned_variant_path( $relative, ?int $attachment_id = null ): bool {
+		if ( ! is_string( $relative ) || validate_file( $relative ) || 0 === strpos( $relative, '/' ) ) {
+			return false;
+		}
+		$owner = null === $attachment_id ? '(?:\d+-)?' : $attachment_id . '-';
+		return 1 === preg_match( '/\.kilobyte-' . $owner . '[a-f0-9-]{36}\.(?:jpg|png|webp|avif)$/iD', $relative );
 	}
 
 	/**

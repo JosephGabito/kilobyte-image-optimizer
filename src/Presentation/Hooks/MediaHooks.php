@@ -150,6 +150,7 @@ final class MediaHooks {
 	 */
 	public function register(): void {
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_upload_interceptor' ) );
+		add_action( 'wp_enqueue_media', array( $this, 'enqueue_media_modal_assets' ) );
 		add_filter( 'rest_request_before_callbacks', array( $this, 'enter_core_upload' ), 10, 3 );
 		add_filter( 'rest_request_after_callbacks', array( $this, 'leave_core_upload' ), 10, 3 );
 		add_action( 'add_attachment', array( $this, 'maybe_set_auto_alt_text' ) );
@@ -170,9 +171,29 @@ final class MediaHooks {
 	 * @return void
 	 */
 	public function enqueue_upload_interceptor( string $hook_suffix ): void {
-		$upload_screens = array( 'upload.php', 'media-new.php', 'post.php', 'post-new.php', 'site-editor.php' );
+		$upload_screens = array(
+			'upload.php',
+			'media-new.php',
+			'post.php',
+			'post-new.php',
+			'site-editor.php',
+			'media_page_' . OptimizerAdminPage::PAGE_SLUG,
+		);
 
-		if ( ! in_array( $hook_suffix, $upload_screens, true ) || ! current_user_can( 'upload_files' ) ) {
+		if ( ! in_array( $hook_suffix, $upload_screens, true ) ) {
+			return;
+		}
+
+		$this->enqueue_media_modal_assets();
+	}
+
+	/**
+	 * Enqueue media modal restore handler and upload interceptor whenever WordPress loads the Media Library modal in admin.
+	 *
+	 * @return void
+	 */
+	public function enqueue_media_modal_assets(): void {
+		if ( ! is_admin() || ! current_user_can( 'upload_files' ) || wp_script_is( 'kilobyte-io-upload-interceptor', 'enqueued' ) ) {
 			return;
 		}
 
@@ -231,7 +252,7 @@ final class MediaHooks {
 			$paths = array_merge( $paths, array_values( $this->attachments->variant_paths( $id, $record ) ) );
 		}
 		$this->pending_deletions[ $key ] = array(
-			'paths'   => array_values( array_unique( $paths ) ),
+			'paths'   => array_values( array_unique( array_filter( $paths, array( $this->attachments, 'is_owned_variant_path' ) ) ) ),
 			'record'  => $record,
 			'release' => $release,
 		);

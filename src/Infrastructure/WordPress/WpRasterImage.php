@@ -49,14 +49,16 @@ final class WpRasterImage {
 	 * @return bool
 	 */
 	public static function is_animated( string $path, string $mime ): bool {
-		if ( ! in_array( $mime, array( 'image/png', 'image/webp', 'image/avif' ), true ) ) {
+		if ( ! in_array( $mime, array( 'image/png', 'image/webp', 'image/avif', 'image/gif' ), true ) ) {
 			return false;
 		}
 
-		// Called after is_bounded(). Keep animation data out of the image editor.
-		$contents = WpLocalFilesystem::get()->get_contents( $path );
-		if ( ! is_string( $contents ) ) {
+		$contents = self::animation_contents( $path );
+		if ( null === $contents ) {
 			return true;
+		}
+		if ( 'image/gif' === $mime ) {
+			return 1 !== self::gif_frame_count( $contents );
 		}
 		if ( 'image/webp' === $mime ) {
 			return strlen( $contents ) > 20 && 'VP8X' === substr( $contents, 12, 4 ) && (bool) ( ord( $contents[20] ) & 0x02 );
@@ -78,6 +80,113 @@ final class WpRasterImage {
 			$offset += 12 + $chunk['length'];
 		}
 		return false;
+	}
+
+	/**
+	 * Read bounded compressed bytes without invoking an image editor.
+	 *
+	 * @param string $path Validated local file.
+	 * @return string|null
+	 */
+	private static function animation_contents( string $path ): ?string {
+		$bytes = wp_filesize( $path );
+		$limit = wp_convert_hr_to_bytes( (string) ini_get( 'memory_limit' ) );
+		if ( $bytes <= 0 || $bytes > self::MAX_BYTES
+			|| ( $limit > 0 && memory_get_usage( true ) + $bytes + 2 * MB_IN_BYTES >= $limit )
+		) {
+			return null;
+		}
+		$contents = WpLocalFilesystem::get()->get_contents( $path );
+		return is_string( $contents ) ? $contents : null;
+	}
+
+	/**
+	 * Count complete GIF frames without decoding their pixels.
+	 *
+	 * @param string $contents Bounded file contents.
+	 * @param bool   $full_canvas Require the frame to fill the logical canvas.
+	 * @return int Zero for an unsupported or incomplete image.
+	 */
+	private static function gif_frame_count( string $contents, bool $full_canvas = false ): int {
+		$total = strlen( $contents );
+		if ( $total < 13 || ! in_array( substr( $contents, 0, 6 ), array( 'GIF87a', 'GIF89a' ), true ) ) {
+			return 0;
+		}
+
+		$canvas = unpack( 'vwidth/vheight', $contents, 6 );
+		if ( empty( $canvas['width'] ) || empty( $canvas['height'] ) || $canvas['width'] * $canvas['height'] > self::MAX_PIXELS ) {
+			return 0;
+		}
+		$color_table_size = static function ( int $flags ): int {
+			return ( $flags & 0x80 ) ? 3 * ( 2 << ( $flags & 7 ) ) : 0;
+		};
+		$offset           = 13 + $color_table_size( ord( $contents[10] ) );
+		$frames           = 0;
+		while ( $offset < $total ) {
+			$block = ord( $contents[ $offset++ ] );
+			if ( 0x3b === $block ) {
+				return $offset === $total ? $frames : 0;
+			}
+			if ( 0x2c === $block ) {
+				++$frames;
+				if ( $offset + 9 >= $total ) {
+					return 0;
+				}
+				$frame = unpack( 'vleft/vtop/vwidth/vheight', $contents, $offset );
+				if ( empty( $frame['width'] ) || empty( $frame['height'] )
+					|| $frame['left'] + $frame['width'] > $canvas['width'] || $frame['top'] + $frame['height'] > $canvas['height']
+				) {
+					return 0;
+				}
+				if ( $full_canvas && ( $frame['left'] || $frame['top'] || $frame['width'] !== $canvas['width'] || $frame['height'] !== $canvas['height'] ) ) {
+					return 0;
+				}
+				// Image descriptor, local color table, and LZW minimum code size.
+				$offset += 10 + $color_table_size( ord( $contents[ $offset + 8 ] ) );
+			} elseif ( 0x21 === $block && $offset < $total && 0x01 !== ord( $contents[ $offset ] ) ) {
+				++$offset;
+			} else {
+				// Plain text is also a rendering block. Keep the original if present.
+				return 0;
+			}
+
+			while ( $offset < $total ) {
+				$length = ord( $contents[ $offset++ ] );
+				if ( 0 === $length ) {
+					break;
+				}
+				$offset += $length;
+			}
+		}
+		return 0;
+	}
+
+	/**
+	 * Recognize a complete animated GIF without allocating its decoded frames.
+	 *
+	 * @param string $path Validated file path.
+	 * @return bool
+	 */
+	public static function has_gif_animation( string $path ): bool {
+		$contents = self::animation_contents( $path );
+		return null !== $contents && self::gif_frame_count( $contents ) > 1;
+	}
+
+	/**
+	 * Verify the editor decoded the whole GIF canvas and prepare GD's truecolor output.
+	 *
+	 * @param string           $path   Local image path.
+	 * @param \WP_Image_Editor $editor Loaded image editor.
+	 * @return bool
+	 */
+	public static function prepare_still_gif( string $path, \WP_Image_Editor $editor ): bool {
+		$contents = self::animation_contents( $path );
+		$frame    = $editor->get_size();
+		if ( null === $contents || 1 !== self::gif_frame_count( $contents, true ) || ! is_array( $frame ) ) {
+			return false;
+		}
+		// GD's crop copies palette pixels into a truecolor buffer with alpha.
+		return ! $editor instanceof \WP_Image_Editor_GD || ! is_wp_error( $editor->crop( 0, 0, $frame['width'], $frame['height'] ) );
 	}
 
 	/**

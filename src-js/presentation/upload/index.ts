@@ -5,6 +5,7 @@ import { isSupportedMime } from '../../domain/format';
 import type { UploadBootstrapConfig } from '../../domain/types';
 import { browserCompressor } from '../../infrastructure/browserCompressor';
 import { wpRestClient } from '../../infrastructure/wpRestClient';
+import { restoreControls, updateRestoredAttachment } from '../../infrastructure/wpMedia';
 import { restoreDetails } from '../restoreDetails';
 
 declare global {
@@ -124,7 +125,7 @@ function installUploadMiddleware( config: UploadBootstrapConfig ): void {
 	apiFetch.use( async ( options, next ) => {
 		const isMediaPath = options.path?.split( '?' )[ 0 ].replace( /\/$/, '' ) === '/wp/v2/media';
 		const body = options.body;
-		if ( ! isMediaPath || options.method?.toUpperCase() !== 'POST' || ! ( body instanceof FormData ) || options.parse === false ) {
+		if ( ! config.settings.enabled || ! isMediaPath || options.method?.toUpperCase() !== 'POST' || ! ( body instanceof FormData ) || options.parse === false ) {
 			return next( options );
 		}
 		if ( mediaUrl.origin !== window.location.origin || body.get( 'generate_sub_sizes' ) === 'false' ) {
@@ -147,6 +148,9 @@ function installUploadMiddleware( config: UploadBootstrapConfig ): void {
 
 		status.start();
 		processing = processing.then( async () => {
+			if ( ! config.settings.enabled ) {
+				return;
+			}
 			let result;
 			try {
 				// WordPress compares with the file it actually kept after upload processing.
@@ -155,17 +159,17 @@ function installUploadMiddleware( config: UploadBootstrapConfig ): void {
 				await wpRestClient.optimizeOnServer( id );
 				return;
 			}
-			if ( result.reason === 'animated' ) {
+			if ( result.reason === 'animated' || result.reason === 'original_format_kept' ) {
 				return;
 			}
 
-			if ( result.file && result.filename && config.outputMimes.includes( result.file.type ) ) {
+			if ( result.file && result.filename && config.outputMimes.includes( result.file.type ) && ( file.type !== 'image/gif' || result.sourceHash ) ) {
 				try {
-					await wpRestClient.uploadOptimized( id, result.file, result.filename );
+					await wpRestClient.uploadOptimized( id, result.file, result.filename, { sourceHash: result.sourceHash } );
 					return;
 				} catch ( error ) {
 					const code = ( error as { code?: string } )?.code;
-					if ( code !== 'kilobyte_io_invalid_mime' && code !== 'kilobyte_io_invalid_image' ) {
+					if ( code !== 'kilobyte_io_invalid_mime' && code !== 'kilobyte_io_invalid_image' && code !== 'kilobyte_io_source_changed' ) {
 						throw error;
 					}
 				}
@@ -178,6 +182,7 @@ function installUploadMiddleware( config: UploadBootstrapConfig ): void {
 }
 
 function installRestoreButtonHandler(): void {
+	const restoring = new Set< number >();
 	document.addEventListener( 'click', async ( event ) => {
 		const target = event.target;
 		if ( ! ( target instanceof Element ) ) {
@@ -192,6 +197,10 @@ function installRestoreButtonHandler(): void {
 		button.nextElementSibling?.matches( '.kilobyte-restore-error' ) && button.nextElementSibling.remove();
 		button.disabled = true;
 		button.textContent = __( 'Restoring...', 'kilobyte-image-optimizer' );
+		if ( restoring.has( id ) ) {
+			return;
+		}
+		restoring.add( id );
 
 		try {
 			const result = await wpRestClient.restoreAttachment( id );
@@ -199,8 +208,8 @@ function installRestoreButtonHandler(): void {
 			const message = details
 				? `${ __( 'Original restored.', 'kilobyte-image-optimizer' ) } ${ details }`
 				: __( 'Restored', 'kilobyte-image-optimizer' );
-			button.closest( 'td' )?.replaceChildren( message );
-			button.textContent = message;
+			updateRestoredAttachment( id, message, true );
+			window.dispatchEvent( new CustomEvent( 'kilobyte:restored', { detail: { id } } ) );
 		} catch ( error ) {
 			const message = toFriendlyError( error );
 			const feedback = document.createElement( 'div' );
@@ -212,9 +221,13 @@ function installRestoreButtonHandler(): void {
 			summary.textContent = __( 'Technical details', 'kilobyte-image-optimizer' );
 			details.append( summary, message.technical );
 			feedback.append( details );
-			button.after( feedback );
-			button.disabled = false;
-			button.textContent = __( 'Restore original', 'kilobyte-image-optimizer' );
+			for ( const control of restoreControls( id ) ) {
+				control.after( feedback.cloneNode( true ) );
+				control.disabled = false;
+				control.textContent = __( 'Restore original', 'kilobyte-image-optimizer' );
+			}
+		} finally {
+			restoring.delete( id );
 		}
 	} );
 }
@@ -222,8 +235,6 @@ function installRestoreButtonHandler(): void {
 const config = window.KilobyteIOUploadConfig;
 if ( config ) {
 	browserCompressor.setWorkerUrl( config.workerUrl );
-	if ( config.settings.enabled ) {
-		installUploadMiddleware( config );
-	}
+	installUploadMiddleware( config );
 	installRestoreButtonHandler();
 }

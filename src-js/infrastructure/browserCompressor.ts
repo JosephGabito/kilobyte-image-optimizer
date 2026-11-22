@@ -94,6 +94,9 @@ async function compress(
 	if ( await isAnimated( file ) ) {
 		return skipped( 'animated' );
 	}
+	if ( file.type === 'image/gif' && settings.format === 'original' ) {
+		return skipped( 'original_format_kept' );
+	}
 
 	const support = await detectSupport();
 	const target = resolveTargetMime( settings.format, file.type, support ) ??
@@ -142,6 +145,15 @@ async function compress(
 	}
 
 	const filename = swapExtension( file.name, target.ext );
+	let sourceHash: string | undefined;
+	if ( file.type === 'image/gif' && globalThis.crypto?.subtle ) {
+		try {
+			const digest = await globalThis.crypto.subtle.digest( 'SHA-256', await file.arrayBuffer() );
+			sourceHash = Array.from( new Uint8Array( digest ), ( byte ) => byte.toString( 16 ).padStart( 2, '0' ) ).join( '' );
+		} catch {
+			// Upload callers can use the server when the browser cannot verify the GIF.
+		}
+	}
 	return {
 		skipped: false,
 		file: new File( [ encoded.blob ], filename, { type: target.mime } ),
@@ -151,6 +163,7 @@ async function compress(
 		originalSize,
 		optimizedSize: encoded.blob.size,
 		savedBytes: Math.max( 0, originalSize - encoded.blob.size ),
+		sourceHash,
 		width: encoded.width,
 		height: encoded.height,
 	};

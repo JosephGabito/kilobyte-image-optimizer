@@ -104,10 +104,17 @@ export const wpRestClient = {
 	uploadOptimized(
 		id: number,
 		file: File,
-		filename: string
+		filename: string,
+		options: { preview?: boolean; sourceHash?: string } = {}
 	): Promise< OptimizeResponse > {
 		const body = new FormData();
 		body.append( 'file', file, filename );
+		if ( options.preview ) {
+			body.append( 'preview', '1' );
+		}
+		if ( options.sourceHash ) {
+			body.append( 'source_hash', options.sourceHash );
+		}
 		return apiFetch< OptimizeResponse >( {
 			path: `${ BASE }/optimize/${ id }`,
 			method: 'POST',

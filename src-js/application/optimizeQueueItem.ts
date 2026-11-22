@@ -8,7 +8,7 @@ export interface CompressorPort {
 
 export interface OptimizeApiPort {
 	optimizeOnServer: ( id: number ) => Promise< OptimizeResponse >;
-	uploadOptimized: ( id: number, file: File, filename: string ) => Promise< OptimizeResponse >;
+	uploadOptimized: ( id: number, file: File, filename: string, options?: { sourceHash?: string } ) => Promise< OptimizeResponse >;
 	markSkipped: ( id: number ) => Promise< void >;
 	fetchImageBlob: ( url: string, onProgress?: ( loaded: number, total: number ) => void ) => Promise< Blob >;
 }
@@ -30,14 +30,23 @@ export async function optimizeQueueItem(
 	onStage: ( stage: OptimizeStage, filename: string, download?: { loaded: number; total: number } ) => void,
 	outputMimes: string[]
 ): Promise< OptimizeItemOutcome > {
+	const skipped = ( status?: string ): OptimizeItemOutcome => {
+		const labels: Partial< Record< string, string > > = {
+			already_optimal: 'Already small enough',
+			animated: 'Animation kept',
+			original_format_kept: 'Original format kept',
+			gif_canvas_kept: 'GIF canvas kept',
+		};
+		return {
+			title: item.filename,
+			subtitle: ( status && labels[ status ] ) || 'Original kept',
+			metric: 'Skipped',
+			tone: 'muted',
+		};
+	};
 	const outcome = ( saved: OptimizeResponse ): OptimizeItemOutcome => {
 		if ( saved.skipped ) {
-			return {
-				title: item.filename,
-				subtitle: saved.status === 'already_optimal' ? 'Already small enough' : 'Original kept',
-				metric: 'Skipped',
-				tone: 'muted',
-			};
+			return skipped( saved.status );
 		}
 		return {
 			title: item.filename,
@@ -73,26 +82,24 @@ export async function optimizeQueueItem(
 	if ( result.reason === 'unsupported_mime' ) {
 		return onServer();
 	}
-	if ( result.reason === 'animated' ) {
-		return {
-			title: item.filename,
-			subtitle: 'Animation kept',
-			metric: 'Skipped',
-			tone: 'muted',
-		};
+	if ( result.reason === 'animated' || result.reason === 'original_format_kept' ) {
+		return skipped( result.reason );
 	}
 
 	onStage( 'save', item.filename );
 	if ( ! result.file || ! result.filename ) {
 		await api.markSkipped( item.id );
-		return outcome( { id: item.id, skipped: true, status: 'already_optimal' } as OptimizeResponse );
+		return skipped( 'already_optimal' );
+	}
+	if ( item.mime_type === 'image/gif' && ! result.sourceHash ) {
+		return onServer();
 	}
 
 	try {
-		return outcome( await api.uploadOptimized( item.id, result.file, result.filename ) );
+		return outcome( await api.uploadOptimized( item.id, result.file, result.filename, { sourceHash: result.sourceHash } ) );
 	} catch ( error ) {
 		const code = ( error as { code?: string } )?.code;
-		if ( code === 'kilobyte_io_invalid_mime' || code === 'kilobyte_io_invalid_image' ) {
+		if ( code === 'kilobyte_io_invalid_mime' || code === 'kilobyte_io_invalid_image' || code === 'kilobyte_io_source_changed' ) {
 			return onServer();
 		}
 		throw error;

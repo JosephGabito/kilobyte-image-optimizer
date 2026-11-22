@@ -16,6 +16,7 @@ final class OperationFailure {
 
 	public const BUSY               = 'locked';
 	public const MISSING_SOURCE     = 'missing_source';
+	public const SOURCE_CHANGED     = 'source_changed';
 	public const ORIGINAL_MISSING   = 'original_missing';
 	public const NO_BACKUP          = 'no_backup';
 	public const MISSING_BACKUP     = 'missing_backup';

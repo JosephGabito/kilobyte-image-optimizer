@@ -27,6 +27,7 @@ final class CompressionPolicy {
 		'image/webp',
 		'image/avif',
 		'image/bmp',
+		'image/gif',
 	);
 
 	/**

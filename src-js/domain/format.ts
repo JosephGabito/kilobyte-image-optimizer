@@ -6,6 +6,7 @@ const SUPPORTED_INPUT_MIMES = new Set< string >( [
 	'image/webp',
 	'image/avif',
 	'image/bmp',
+	'image/gif',
 ] );
 
 export function isSupportedMime( mime: string ): boolean {

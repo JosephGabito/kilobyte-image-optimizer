@@ -94,7 +94,7 @@ final class OptimizeOnServerUseCase {
 				'status'  => 'excluded',
 			);
 		}
-		$image = $this->attachments->find_image( $id );
+		$image = $this->attachments->find_image( $id, true );
 		if ( null === $image || ! $this->policy->is_supported_source_mime( (string) $image['mime_type'] ) ) {
 			return new OperationFailure( OperationFailure::MISSING_SOURCE );
 		}
@@ -113,6 +113,13 @@ final class OptimizeOnServerUseCase {
 
 		if ( isset( $encoded['error'] ) ) {
 			return new OperationFailure( OperationFailure::ENCODE_FAILED, $encoded['error'] );
+		}
+		if ( isset( $encoded['skip_reason'] ) ) {
+			return array(
+				'id'      => $id,
+				'skipped' => true,
+				'status'  => $encoded['skip_reason'],
+			);
 		}
 
 		try {

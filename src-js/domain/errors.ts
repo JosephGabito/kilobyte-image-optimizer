@@ -9,6 +9,7 @@ export type ErrorCode =
 	| 'write_failed'
 	| 'clipboard_failed'
 	| 'original_missing'
+	| 'source_changed'
 	| 'busy'
 	| 'restore_failed'
 	| 'restore_unfinished'
@@ -167,6 +168,15 @@ export function toFriendlyError( err: unknown ): FriendlyError {
 			code: 'original_missing',
 			friendly: 'WordPress could not open the original. Your optimized copy was kept.',
 			action: 'Recover the original or ask your host to check that WordPress can open it, then try again.',
+			technical,
+		};
+	}
+
+	if ( lower.includes( 'source_changed' ) ) {
+		return {
+			code: 'source_changed',
+			friendly: 'WordPress could not match the GIF to the file used for this preview.',
+			action: 'Open the image again or optimize with your site settings.',
 			technical,
 		};
 	}

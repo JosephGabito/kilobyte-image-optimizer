@@ -71,7 +71,8 @@ final class SaveOptimizedVariant {
 			$variant['variant_path'],
 			0,
 			$variant['variants'],
-			$variant['widths']
+			$variant['widths'],
+			$image['source_revision'] ?? ''
 		);
 		if ( ! $this->attachments->save_record( $id, $record ) ) {
 			$this->attachments->delete_sibling_variant( $id, $record );

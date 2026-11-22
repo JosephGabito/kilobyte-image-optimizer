@@ -26,6 +26,7 @@ final class OperationErrorMessage {
 		$errors                   = array(
 			OperationFailure::BUSY               => array( 409, __( 'This image is being processed. Try again in a moment.', 'kilobyte-image-optimizer' ) ),
 			OperationFailure::MISSING_SOURCE     => array( 404, __( 'This image is unavailable or uses an unsupported format.', 'kilobyte-image-optimizer' ) ),
+			OperationFailure::SOURCE_CHANGED     => array( 409, __( 'The GIF source could not be matched to the browser copy. Open the image again or optimize with your site settings.', 'kilobyte-image-optimizer' ) ),
 			OperationFailure::ORIGINAL_MISSING   => array( 409, __( 'WordPress could not verify the original. The optimized copy was kept. Recover the original or ask your host to check that WordPress can open it, then try again.', 'kilobyte-image-optimizer' ) ),
 			OperationFailure::NO_BACKUP          => array( 404, __( 'There is no original to restore for this image.', 'kilobyte-image-optimizer' ) ),
 			OperationFailure::MISSING_BACKUP     => array( 404, __( 'The original backup file is missing.', 'kilobyte-image-optimizer' ) ),

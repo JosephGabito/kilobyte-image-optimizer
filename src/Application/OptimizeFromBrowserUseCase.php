@@ -13,6 +13,7 @@ use Kilobyte\ImageOptimizer\Domain\Policy\CompressionPolicy;
 use Kilobyte\ImageOptimizer\Domain\Repository\AttachmentRepositoryInterface;
 use Kilobyte\ImageOptimizer\Domain\Repository\OptimizationEventsInterface;
 use Kilobyte\ImageOptimizer\Domain\Repository\SettingsRepositoryInterface;
+use Kilobyte\ImageOptimizer\Domain\ValueObject\ImageFormat;
 use Kilobyte\ImageOptimizer\Domain\ValueObject\OptimizationRecord;
 use Kilobyte\ImageOptimizer\Domain\ValueObject\OperationFailure;
 
@@ -64,12 +65,14 @@ final class OptimizeFromBrowserUseCase {
 	 * @param string $tmp_path      Uploaded temporary file.
 	 * @param string $detected_mime Validated MIME type.
 	 * @param int    $candidate_size Size of the validated upload.
+	 * @param bool   $is_preview     Whether the user explicitly selected a preview format.
+	 * @param string $source_hash    Hash of the GIF the browser encoded.
 	 * @return array<string, mixed>|OperationFailure
 	 */
-	public function execute( int $attachment_id, string $tmp_path, string $detected_mime, int $candidate_size ) {
+	public function execute( int $attachment_id, string $tmp_path, string $detected_mime, int $candidate_size, bool $is_preview = false, string $source_hash = '' ) {
 		$result = $this->attachments->with_attachment_lock(
 			$attachment_id,
-			function () use ( $attachment_id, $tmp_path, $detected_mime, $candidate_size ) {
+			function () use ( $attachment_id, $tmp_path, $detected_mime, $candidate_size, $is_preview, $source_hash ) {
 				if ( ! $this->events->should_optimize( $attachment_id ) ) {
 					return array(
 						'id'      => $attachment_id,
@@ -77,7 +80,7 @@ final class OptimizeFromBrowserUseCase {
 						'status'  => 'excluded',
 					);
 				}
-				$image = $this->attachments->find_image( $attachment_id );
+				$image = $this->attachments->find_image( $attachment_id, true );
 				if ( null === $image || ! $this->policy->is_supported_source_mime( (string) $image['mime_type'] ) ) {
 					return new OperationFailure( OperationFailure::MISSING_SOURCE );
 				}
@@ -91,7 +94,33 @@ final class OptimizeFromBrowserUseCase {
 					);
 				}
 
+				if ( $this->attachments->source_is_animated( (string) $image['file'], (string) $image['mime_type'] ) ) {
+					return array(
+						'id'      => $attachment_id,
+						'skipped' => true,
+						'status'  => 'animated',
+					);
+				}
+
 				$settings = $this->settings->load();
+				if ( 'image/gif' !== $image['mime_type'] && '' !== $source_hash ) {
+					return new OperationFailure( OperationFailure::SOURCE_CHANGED );
+				}
+				if ( 'image/gif' === $image['mime_type'] ) {
+					if ( ! $is_preview && ImageFormat::ORIGINAL === $settings->format()->value() ) {
+						return array(
+							'id'      => $attachment_id,
+							'skipped' => true,
+							'status'  => 'original_format_kept',
+						);
+					}
+					if ( ! in_array( $detected_mime, array( 'image/webp', 'image/avif' ), true ) ) {
+						return new OperationFailure( OperationFailure::ENCODE_FAILED );
+					}
+					if ( '' === $source_hash || ! hash_equals( $image['source_hash'], $source_hash ) ) {
+						return new OperationFailure( OperationFailure::SOURCE_CHANGED );
+					}
+				}
 				if ( $this->policy->should_skip_output( (int) $image['file_size'], $candidate_size, $settings ) ) {
 					return $this->save_variant->record_unchanged( $image, OptimizationRecord::ENGINE_BROWSER );
 				}

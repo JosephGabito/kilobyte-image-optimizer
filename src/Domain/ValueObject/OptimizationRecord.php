@@ -73,6 +73,9 @@ final class OptimizationRecord {
 	/** @var array<string, int> */
 	private array $variant_widths;
 
+	/** @var string */
+	private string $source_revision;
+
 	/**
 	 * Relative sibling variant path inside uploads directory (for non-destructive format conversion).
 	 *
@@ -124,6 +127,7 @@ final class OptimizationRecord {
 	 * @param int    $backup_bytes   Backup size in bytes.
 	 * @param array<string, int> $variant_widths Width of each generated file.
 	 * @param array<string, string> $variants   Source paths mapped to generated files.
+	 * @param string                $source_revision Original file revision for GIF copies.
 	 */
 	public function __construct(
 		int $original_size,
@@ -138,21 +142,23 @@ final class OptimizationRecord {
 		string $variant_path = '',
 		int $backup_bytes = 0,
 		array $variants = array(),
-		array $variant_widths = array()
+		array $variant_widths = array(),
+		string $source_revision = ''
 	) {
-		$this->original_size  = max( 0, $original_size );
-		$this->optimized_size = max( 0, $optimized_size );
-		$this->format         = $format;
-		$this->original_name  = $original_name;
-		$this->backup_path    = $backup_path;
-		$this->optimized_at   = $optimized_at;
-		$this->status         = $status;
-		$this->engine         = $engine;
-		$this->delivery_mode  = self::MODE_SIBLING === $delivery_mode ? self::MODE_SIBLING : self::MODE_IN_PLACE;
-		$this->variant_path   = $variant_path;
-		$this->backup_bytes   = '' !== $backup_path ? max( 0, $backup_bytes ) : 0;
-		$this->variants       = $variants;
-		$this->variant_widths = $variant_widths;
+		$this->original_size   = max( 0, $original_size );
+		$this->optimized_size  = max( 0, $optimized_size );
+		$this->format          = $format;
+		$this->original_name   = $original_name;
+		$this->backup_path     = $backup_path;
+		$this->optimized_at    = $optimized_at;
+		$this->status          = $status;
+		$this->engine          = $engine;
+		$this->delivery_mode   = self::MODE_SIBLING === $delivery_mode ? self::MODE_SIBLING : self::MODE_IN_PLACE;
+		$this->variant_path    = $variant_path;
+		$this->backup_bytes    = '' !== $backup_path ? max( 0, $backup_bytes ) : 0;
+		$this->variants        = $variants;
+		$this->variant_widths  = $variant_widths;
+		$this->source_revision = $source_revision;
 	}
 
 	/**
@@ -178,7 +184,8 @@ final class OptimizationRecord {
 			isset( $data['variant_path'] ) ? (string) $data['variant_path'] : '',
 			isset( $data['backup_bytes'] ) ? (int) $data['backup_bytes'] : 0,
 			isset( $data['variants'] ) && is_array( $data['variants'] ) ? array_filter( $data['variants'], 'is_string' ) : array(),
-			isset( $data['variant_widths'] ) && is_array( $data['variant_widths'] ) ? array_filter( $data['variant_widths'], 'is_int' ) : array()
+			isset( $data['variant_widths'] ) && is_array( $data['variant_widths'] ) ? array_filter( $data['variant_widths'], 'is_int' ) : array(),
+			is_string( $data['source_revision'] ?? null ) ? $data['source_revision'] : ''
 		);
 	}
 
@@ -189,20 +196,21 @@ final class OptimizationRecord {
 	 */
 	public function to_array(): array {
 		return array(
-			'original_size'  => $this->original_size,
-			'optimized_size' => $this->optimized_size,
-			'saved_bytes'    => $this->saved_bytes(),
-			'format'         => $this->format,
-			'original_name'  => $this->original_name,
-			'backup_path'    => $this->backup_path,
-			'backup_bytes'   => $this->backup_bytes,
-			'variant_path'   => $this->variant_path,
-			'variants'       => $this->variants,
-			'variant_widths' => $this->variant_widths,
-			'delivery_mode'  => $this->delivery_mode,
-			'optimized_at'   => $this->optimized_at,
-			'status'         => $this->status,
-			'engine'         => $this->engine,
+			'original_size'   => $this->original_size,
+			'optimized_size'  => $this->optimized_size,
+			'saved_bytes'     => $this->saved_bytes(),
+			'format'          => $this->format,
+			'original_name'   => $this->original_name,
+			'backup_path'     => $this->backup_path,
+			'backup_bytes'    => $this->backup_bytes,
+			'variant_path'    => $this->variant_path,
+			'variants'        => $this->variants,
+			'variant_widths'  => $this->variant_widths,
+			'source_revision' => $this->source_revision,
+			'delivery_mode'   => $this->delivery_mode,
+			'optimized_at'    => $this->optimized_at,
+			'status'          => $this->status,
+			'engine'          => $this->engine,
 		);
 	}
 
@@ -213,6 +221,13 @@ final class OptimizationRecord {
 	 */
 	public function original_size(): int {
 		return $this->original_size;
+	}
+
+	/**
+	 * @return string
+	 */
+	public function source_revision(): string {
+		return $this->source_revision;
 	}
 
 	/**

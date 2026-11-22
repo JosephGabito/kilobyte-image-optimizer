@@ -53,7 +53,7 @@ export interface BrowserSupport {
 
 export interface CompressionResult< EncodedFile > {
 	skipped: boolean;
-	reason?: 'unsupported_mime' | 'not_smaller' | 'animated';
+	reason?: 'unsupported_mime' | 'not_smaller' | 'animated' | 'original_format_kept';
 	file?: EncodedFile;
 	filename?: string;
 	mimeType?: string;
@@ -61,12 +61,14 @@ export interface CompressionResult< EncodedFile > {
 	originalSize: number;
 	optimizedSize: number;
 	savedBytes?: number;
+	sourceHash?: string;
 	width?: number;
 	height?: number;
 }
 
 export interface RestoreResponse {
 	restored: boolean;
+	mode?: 'sibling' | 'in_place';
 	thumbnails_ready?: boolean;
 	backup_removed?: boolean;
 }
