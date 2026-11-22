@@ -9,12 +9,16 @@ export type ErrorCode =
 	| 'write_failed'
 	| 'clipboard_failed'
 	| 'original_missing'
+	| 'backup_missing'
+	| 'no_backup'
+	| 'encode_failed'
 	| 'source_changed'
 	| 'busy'
 	| 'restore_failed'
 	| 'restore_unfinished'
 	| 'regen_failed'
 	| 'purge_failed'
+	| 'settings_save_failed'
 	| 'unknown';
 
 export interface FriendlyError {
@@ -50,6 +54,15 @@ export function toFriendlyError( err: unknown ): FriendlyError {
 	const technical = extractTechnicalMessage( err );
 	const lower = technical.toLowerCase();
 
+	if ( lower.includes( 'kilobyte_io_settings_save_failed' ) ) {
+		return {
+			code: 'settings_save_failed',
+			friendly: 'WordPress could not save your preferences. Your changes are still here.',
+			action: 'Try again. If the problem continues, ask your host to check that WordPress can save settings.',
+			technical,
+		};
+	}
+
 	if (
 		lower.includes( 'not a valid json response' ) ||
 		lower.includes( 'unexpected token <' ) ||
@@ -63,6 +76,22 @@ export function toFriendlyError( err: unknown ): FriendlyError {
 		};
 	}
 
+	if ( lower.includes( 'kilobyte_io_missing_backup' ) ) {
+		return {
+			code: 'backup_missing',
+			friendly: 'WordPress could not find the saved original.',
+			action: 'Recover the file from your site backup, then retry the restore.',
+			technical,
+		};
+	}
+	if ( lower.includes( 'kilobyte_io_no_backup' ) ) {
+		return {
+			code: 'no_backup',
+			friendly: 'There is no optimized copy to restore for this image.',
+			action: 'Refresh the Media Library to check whether the image has already been restored.',
+			technical,
+		};
+	}
 	if (
 		lower.includes( 'image size limit' ) ||
 		lower.includes( 'image_too_large' ) ||
@@ -140,6 +169,24 @@ export function toFriendlyError( err: unknown ): FriendlyError {
 		};
 	}
 
+	if ( lower.includes( 'gif_structure_unreadable' ) ) {
+		return {
+			code: 'unsupported_format',
+			friendly: 'The browser could not read the full GIF.',
+			action: 'Reopen the GIF to check that it displays correctly, or try another image.',
+			technical,
+		};
+	}
+
+	if ( lower.includes( 'kilobyte_io_encode_failed' ) ) {
+		return {
+			code: 'encode_failed',
+			friendly: 'Your site could not make a smaller copy of this image.',
+			action: 'Check that the original opens in the Media Library. Try a different format in Preview or ask your host to check image support.',
+			technical,
+		};
+	}
+
 	if (
 		lower.includes( 'unsupported' ) ||
 		lower.includes( 'invalid_mime' ) ||
@@ -175,16 +222,16 @@ export function toFriendlyError( err: unknown ): FriendlyError {
 	if ( lower.includes( 'source_changed' ) ) {
 		return {
 			code: 'source_changed',
-			friendly: 'WordPress could not match the GIF to the file used for this preview.',
+			friendly: 'WordPress could not match the source image to the file used for this preview.',
 			action: 'Open the image again or optimize with your site settings.',
 			technical,
 		};
 	}
-	if ( lower.includes( 'kilobyte_io_locked' ) ) {
+	if ( lower.includes( 'kilobyte_io_busy' ) || lower.includes( 'kilobyte_io_locked' ) ) {
 		return {
 			code: 'busy',
-			friendly: 'WordPress is still processing this image.',
-			action: 'Wait for the current job to finish, then try again.',
+			friendly: 'WordPress could not start processing this image.',
+			action: 'Wait for any current jobs to finish, then retry. Ask your host to check database locks if the problem continues.',
 			technical,
 		};
 	}

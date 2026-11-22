@@ -142,8 +142,8 @@ final class OptimizationSettings {
 			2560,
 			true,
 			true,
-			true,
-			true,
+			false,
+			false,
 			3
 		);
 	}

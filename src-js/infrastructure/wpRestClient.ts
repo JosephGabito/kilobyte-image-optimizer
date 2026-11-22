@@ -84,11 +84,7 @@ export const wpRestClient = {
 				return new Blob( chunks, { type: mime } );
 			}
 
-			const blob = await resp.blob();
-			if ( blob.size > MAX_IMAGE_BYTES ) {
-				throw new Error( 'image_too_large' );
-			}
-			return blob;
+			throw new Error( 'This browser could not read the image in bounded chunks.' );
 		} catch ( err: any ) {
 			if ( err?.name === 'AbortError' && ! signal?.aborted ) {
 				throw new Error( 'Timed out loading image from Media Library.' );
@@ -129,10 +125,11 @@ export const wpRestClient = {
 		} );
 	},
 
-	async markSkipped( id: number ): Promise< void > {
-		await apiFetch( {
+	markSkipped( id: number, sourceHash: string ): Promise< { status: string } > {
+		return apiFetch( {
 			path: `${ BASE }/skip/${ id }`,
 			method: 'POST',
+			data: { source_hash: sourceHash },
 		} );
 	},
 
@@ -150,7 +147,7 @@ export const wpRestClient = {
 		} );
 	},
 
-	saveSettings( settings: PluginSettings ): Promise< PluginSettings > {
+	saveSettings( settings: Partial< PluginSettings > ): Promise< PluginSettings > {
 		return apiFetch< PluginSettings >( {
 			path: `${ BASE }/settings`,
 			method: 'POST',

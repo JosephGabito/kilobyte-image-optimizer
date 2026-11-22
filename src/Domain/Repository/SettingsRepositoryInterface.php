@@ -23,13 +23,16 @@ interface SettingsRepositoryInterface {
 	 */
 	public function load(): OptimizationSettings;
 
+	/** Load saved settings before site filters are applied. */
+	public function load_saved(): OptimizationSettings;
+
 	/**
 	 * Persist optimization settings.
 	 *
 	 * @param OptimizationSettings $settings Settings to persist.
-	 * @return void
+	 * @return bool Whether the requested settings are saved.
 	 */
-	public function save( OptimizationSettings $settings ): void;
+	public function save( OptimizationSettings $settings ): bool;
 
 	/**
 	 * Ensure default settings exist on activation.

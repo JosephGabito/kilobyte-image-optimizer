@@ -93,6 +93,7 @@ export interface LogEntry {
 	subtitle?: string;
 	metric?: string;
 	tone: 'success' | 'error' | 'muted' | 'info';
+	count?: number;
 	action?: string;
 	technical?: string;
 }
@@ -129,7 +130,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
 	max_height: 2560,
 	keep_backups: true,
 	skip_smaller: true,
-	auto_alt_text: true,
-	cwv_enhancements: true,
+	auto_alt_text: false,
+	cwv_enhancements: false,
 	concurrency: 3,
 };

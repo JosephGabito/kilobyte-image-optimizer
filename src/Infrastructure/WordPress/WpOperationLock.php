@@ -40,17 +40,24 @@ final class WpOperationLock {
 	 *
 	 * @param string $lock_name Scope of the lock.
 	 * @param int    $wait      Seconds to wait.
+	 * @param bool|null $available Whether the database answered the lock request.
 	 * @return callable|null
 	 */
-	public static function acquire( string $lock_name, int $wait ): ?callable {
+	public static function acquire( string $lock_name, int $wait, ?bool &$available = null ): ?callable {
 		global $wpdb;
 
 		$key = 'kilobyte_' . md5( DB_NAME . ':' . $wpdb->prefix . ':' . $lock_name );
 
-		// Advisory locks belong to the current connection and cannot be cached.
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-		$acquired = $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, %d)', $key, $wait ) );
-		if ( '1' !== (string) $acquired ) {
+		$previous = $wpdb->suppress_errors();
+		try {
+			// Advisory locks belong to the current connection and cannot be cached.
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+			$acquired = (string) $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, %d)', $key, $wait ) );
+		} finally {
+			$wpdb->suppress_errors( $previous );
+		}
+		$available = in_array( $acquired, array( '0', '1' ), true );
+		if ( '1' !== $acquired ) {
 			return null;
 		}
 

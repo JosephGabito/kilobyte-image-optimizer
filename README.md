@@ -17,13 +17,13 @@ Unlimited free WordPress image optimization. Compress photos to **WebP** or **AV
 - **Browser-first compression** using a dedicated Web Worker (`OffscreenCanvas` / Canvas), plus automatic server-side fallback via WordPress's `WP_Image_Editor` (Imagick / GD) for Safari, mobile apps, REST uploads, and unsupported formats.
 - **WebP, AVIF, and Keep original** output modes with three presets (*High detail*, *Balanced*, *Smallest files*) and optional max-width resizing.
 - **Bulk optimization** with resumable pagination, live ETA, per-item status filtering, and non-destructive sibling delivery.
-- **Thumbnail regeneration**, automatic clean alt text from filenames, and image loading hints (`loading="lazy"` / `fetchpriority="high"`).
+- **Thumbnail regeneration**, optional alt text from filenames, and optional image decoding hints.
 - **WP-CLI support**:
   - `wp kilobyte optimize`
   - `wp kilobyte restore`
   - `wp kilobyte stats`
   - `wp kilobyte purge-backups`
-- **Cache-friendly invalidation**: fires `do_action( 'kilobyte_io_variant_changed', $attachment_id )` whenever a variant is created or restored, and retains restored copies for 24 hours so cached HTML never breaks.
+- **Cache-friendly invalidation**: fires `do_action( 'kilobyte_io_variant_changed', $attachment_id )` whenever a variant is created or restored, and keeps restored copies available for at least 24 hours. Clear affected pages if your cache can keep them longer.
 
 ## Requirements
 
@@ -65,6 +65,8 @@ npm run verify
 # Build a clean WordPress.org release ZIP in dist/
 npm run package
 ```
+
+Release checks use a disposable WordPress installation with WordPress Plugin Check installed. Run them from a checkout inside that installation or set `WP_ROOT` to its root. An active Kilobyte installation limits the local check to static checks. CI runs static and runtime checks against the staged plugin. `npm ci` and `npm run build` only need the plugin source and Node.js.
 
 ## License
 

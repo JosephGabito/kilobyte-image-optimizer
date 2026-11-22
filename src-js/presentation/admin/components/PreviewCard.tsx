@@ -19,12 +19,14 @@ import {
 } from '@wordpress/components';
 import { check, download, media, seen, upload } from '@wordpress/icons';
 import { toFriendlyError, type FriendlyError } from '../../../domain/errors';
-import { formatBytes } from '../../../domain/format';
+import { formatBytes, isSupportedMime } from '../../../domain/format';
 import { QUALITY_PRESETS, inferPresetFromQuality, type QualityPresetId } from '../../../domain/presets';
 import type { OutputFormat, PluginSettings } from '../../../domain/types';
 import { browserCompressor } from '../../../infrastructure/browserCompressor';
+import { assertBoundedRaster } from '../../../infrastructure/rasterEncoder';
 import { getWpMedia } from '../../../infrastructure/wpMedia';
 import { wpRestClient } from '../../../infrastructure/wpRestClient';
+import { optimizationSkip } from '../../optimizationSkip';
 
 interface PreviewCardProps {
 	settings: PluginSettings;
@@ -41,7 +43,7 @@ interface PreviewSource {
 	attachmentId?: number;
 	filename: string;
 	file: File;
-	url?: string;
+	canUseSite?: boolean;
 }
 
 interface PreviewStage {
@@ -52,7 +54,7 @@ interface PreviewStage {
 interface PreviewState {
 	attachmentId?: number;
 	filename: string;
-	originalUrl: string;
+	originalUrl?: string;
 	originalSize: number;
 	optimizedUrl?: string;
 	optimizedFile?: File;
@@ -64,7 +66,6 @@ interface PreviewState {
 	originalFormatKept?: boolean;
 	settingsKey?: string;
 	serverOnly?: boolean;
-	sourceMime?: string;
 	sourceHash?: string;
 }
 
@@ -102,10 +103,11 @@ export function PreviewCard( {
 	const currentSettings = useRef( activeSettings );
 	const timerRef = useRef< number | null >( null );
 	currentSettings.current = activeSettings;
-	const previewIsCurrent = preview?.settingsKey === previewSettingsKey( activeSettings );
+	const previewIsCurrent = preview?.serverOnly || preview?.settingsKey === previewSettingsKey( activeSettings );
+	const siteCanEncode = outputMimes.length > 0;
 	const canSavePreview = Boolean(
 		preview?.optimizedFile && outputMimes.includes( preview.optimizedFile.type )
-		&& ! siteRejectedPreview && ( preview.sourceMime !== 'image/gif' || preview.sourceHash )
+		&& ! siteRejectedPreview && preview.sourceHash
 	);
 
 	const cancelPreview = () => {
@@ -152,44 +154,48 @@ export function PreviewCard( {
 
 	const compressSource = async ( src: PreviewSource, signal: AbortSignal ) => {
 		const active = currentSettings.current;
-		const originalUrl = src.url || createPreviewUrl( src.file );
-		setPreview( {
+		let original: PreviewState = {
 			attachmentId: src.attachmentId,
 			filename: src.filename,
-			originalUrl,
 			originalSize: src.file.size,
-		} );
-		setStage( { label: __( 'Compressing image...', 'kilobyte-image-optimizer' ) } );
+			settingsKey: previewSettingsKey( active ),
+		};
+		setPreview( original );
+		setStage( { label: __( 'Checking image size...', 'kilobyte-image-optimizer' ) } );
 
 		try {
+			await assertBoundedRaster( src.file );
+			if ( signal.aborted ) {
+				return;
+			}
+			original = { ...original, originalUrl: createPreviewUrl( src.file ) };
+			setPreview( original );
+			setStage( { label: __( 'Compressing image...', 'kilobyte-image-optimizer' ) } );
+
 			const result = await browserCompressor.compress( src.file, active, signal, true );
 			if ( signal.aborted ) {
 				return;
 			}
-			if ( result.reason === 'unsupported_mime' && src.attachmentId && outputMimes.length > 0 ) {
-				setPreview( {
-					attachmentId: src.attachmentId,
-					filename: src.filename,
-					originalUrl,
-					originalSize: src.file.size,
-					settingsKey: previewSettingsKey( active ),
-					serverOnly: true,
-				} );
+			if ( result.reason === 'unsupported_mime' && src.canUseSite ) {
+				setPreview( { ...original, serverOnly: true } );
 				return;
 			}
-			if ( result.reason === 'animated' || result.reason === 'unsupported_mime' ) {
-				throw new Error( result.reason === 'animated' ? 'animated_image' : 'unsupported_format' );
+			if ( result.reason === 'animated' ) {
+				source.current = null;
+				setPreview( null );
+				setError( toFriendlyError( 'animated_image' ) );
+				return;
+			}
+			if ( result.reason === 'unsupported_mime' ) {
+				throw new Error( 'unsupported_format' );
 			}
 			const savedPercent = result.originalSize > 0
 				? Math.max( 0, Math.round( ( ( result.originalSize - result.optimizedSize ) / result.originalSize ) * 1000 ) / 10 )
 				: 0;
 
 			setPreview( {
-				attachmentId: src.attachmentId,
-				filename: src.filename,
-				originalUrl,
-				originalSize: result.originalSize,
-				optimizedUrl: result.file ? createPreviewUrl( result.file ) : originalUrl,
+				...original,
+				optimizedUrl: result.file ? createPreviewUrl( result.file ) : original.originalUrl,
 				optimizedFile: result.file,
 				optimizedSize: result.optimizedSize,
 				savedPercent,
@@ -197,14 +203,14 @@ export function PreviewCard( {
 				formatMatches: active.format === 'original' || result.format === active.format,
 				skipped: result.skipped,
 				originalFormatKept: result.reason === 'original_format_kept',
-				settingsKey: previewSettingsKey( active ),
-				sourceMime: src.file.type,
 				sourceHash: result.sourceHash,
 			} );
 		} catch ( error ) {
 			if ( ! signal.aborted ) {
-				source.current = null;
-				setPreview( null );
+				if ( ! original.originalUrl || ! src.canUseSite ) {
+					source.current = null;
+				}
+				setPreview( src.canUseSite ? { ...original, serverOnly: true } : null );
 				setError( toFriendlyError( error ) );
 			}
 		} finally {
@@ -221,7 +227,9 @@ export function PreviewCard( {
 	) => {
 		const signal = beginPreview();
 		source.current = null;
-		setPreview( { attachmentId, filename, originalUrl: url, originalSize: knownBytes ?? 0 } );
+		const original = { attachmentId, filename, originalSize: knownBytes ?? 0 };
+		const canUseSite = Boolean( attachmentId && siteCanEncode && ( ! mime || isSupportedMime( mime ) ) );
+		setPreview( original );
 		setStage( { label: __( 'Reading image...', 'kilobyte-image-optimizer' ) } );
 
 		try {
@@ -240,14 +248,17 @@ export function PreviewCard( {
 			}, signal );
 
 			if ( ! signal.aborted ) {
-				const file = new File( [ blob ], filename, { type: blob.type || mime || 'image/jpeg' } );
-				source.current = { attachmentId, filename, file, url };
+				const responseMime = blob.type.split( ';' )[ 0 ].trim();
+				const file = new File( [ blob ], filename, {
+					type: responseMime && responseMime !== 'application/octet-stream' ? responseMime : mime,
+				} );
+				source.current = { attachmentId, filename, file, canUseSite };
 				await compressSource( source.current, signal );
 			}
 		} catch ( error ) {
 			if ( ! signal.aborted ) {
 				source.current = null;
-				setPreview( null );
+				setPreview( canUseSite ? { ...original, serverOnly: true } : null );
 				setError( toFriendlyError( error ) );
 				finishPreview( signal );
 			}
@@ -310,25 +321,8 @@ export function PreviewCard( {
 			}
 
 			if ( response.skipped ) {
-				let message: string = __( 'The original is already small enough. WordPress kept it.', 'kilobyte-image-optimizer' );
-				switch ( response.status ) {
-					case 'already_processed':
-						message = __( 'The library already has an optimized copy. Restore the original before saving another.', 'kilobyte-image-optimizer' );
-						break;
-					case 'excluded':
-						message = __( 'A site rule excludes this image from optimization.', 'kilobyte-image-optimizer' );
-						break;
-					case 'animated':
-						message = __( 'WordPress kept the original to preserve its animation.', 'kilobyte-image-optimizer' );
-						break;
-					case 'original_format_kept':
-						message = __( 'WordPress kept the GIF format. Choose WebP or AVIF to make a separate copy.', 'kilobyte-image-optimizer' );
-						break;
-					case 'gif_canvas_kept':
-						message = __( 'WordPress kept the full GIF image. Try a browser that can make a WebP or AVIF copy.', 'kilobyte-image-optimizer' );
-						break;
-				}
-				onSaveMessage( filename, message, 'info' );
+				const explanation = optimizationSkip( response.status );
+				onSaveMessage( filename, [ explanation.subtitle, explanation.action ].filter( Boolean ).join( ' ' ), 'info' );
 			} else {
 				onSaveMessage(
 					filename,
@@ -456,7 +450,7 @@ export function PreviewCard( {
 					{ error && (
 						<Surface variant="secondary">
 							<VStack spacing={ 1 } style={ { padding: 12 } }>
-								<Text size={ 13 } weight={ 600 } isDestructive>
+								<Text size={ 13 } weight={ 600 } isDestructive role="alert">
 									{ error.friendly }
 								</Text>
 								<Text size={ 12 } variant="muted">
@@ -542,16 +536,18 @@ export function PreviewCard( {
 													: '' }
 											</Text>
 										</HStack>
-										<img
-											src={ preview.originalUrl }
-											alt={ preview.filename }
-											style={ {
-												width: '100%',
-												maxHeight: 220,
-												objectFit: 'contain',
-												display: 'block',
-											} }
-										/>
+										{ preview.originalUrl && (
+											<img
+												src={ preview.originalUrl }
+												alt={ preview.filename }
+												style={ {
+													width: '100%',
+													maxHeight: 220,
+													objectFit: 'contain',
+													display: 'block',
+												} }
+											/>
+										) }
 									</VStack>
 								</Surface>
 
@@ -589,7 +585,7 @@ export function PreviewCard( {
 												<Text size={ 12 } variant="muted">
 													{ stage.label }
 												</Text>
-												<ProgressBar value={ stage.percent } />
+												<ProgressBar value={ stage.percent } aria-label={ __( 'Image preview progress', 'kilobyte-image-optimizer' ) } />
 											</VStack>
 										) : (
 											preview.optimizedUrl && (
@@ -624,7 +620,9 @@ export function PreviewCard( {
 								<Text size={ 12 } variant="muted">
 									{ preview.serverOnly
 										? __( 'Your browser could not make a preview. You can optimize using your site settings.', 'kilobyte-image-optimizer' )
-										: __( 'WordPress cannot save this preview. Choose another format, download the copy, or optimize with your site settings. The site may use a different format or quality.', 'kilobyte-image-optimizer' ) }
+										: siteCanEncode
+										? __( 'WordPress cannot save this preview. Choose another format, download the copy, or optimize with your site settings. The site may use a different format or quality.', 'kilobyte-image-optimizer' )
+										: __( 'WordPress cannot save this preview. You can download the copy.', 'kilobyte-image-optimizer' ) }
 								</Text>
 							) }
 
@@ -639,7 +637,7 @@ export function PreviewCard( {
 
 								{ ! stage && previewIsCurrent && ( preview.optimizedFile || preview.serverOnly ) && (
 									<>
-										{ preview.attachmentId && (
+										{ preview.attachmentId && ( canSavePreview || siteCanEncode ) && (
 											<Button
 												variant="secondary"
 												size="compact"

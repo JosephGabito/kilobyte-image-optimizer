@@ -16,7 +16,7 @@ Preview compression on one of your images before processing the Media Library. K
 
 Bulk optimization keeps the original Media Library file and saves a smaller copy beside it. Supported images in posts and featured images can use that copy. The original remains available as a fallback. To go back, choose **Restore all** in **Media > Optimization**, or restore an individual image from the Media Library. Transfer savings estimate how much smaller the generated copies are. Responsive markup uses the original files when Kilobyte cannot provide a suitable set of copies. Keeping the originals uses additional storage.
 
-You can also regenerate thumbnails, fill empty image descriptions from filenames, and adjust image loading hints. WP-CLI supports `wp kilobyte optimize`, `wp kilobyte restore`, `wp kilobyte stats`, and `wp kilobyte purge-backups`. Restore keeps original backups from earlier builds in the uploads folder. The purge command clears references after that folder has been archived or emptied.
+You can also regenerate thumbnails. Optional preferences fill empty image descriptions from filenames and add image decoding hints. WP-CLI supports `wp kilobyte optimize`, `wp kilobyte restore`, `wp kilobyte stats`, and `wp kilobyte purge-backups`. Restore keeps original backups from earlier builds in the uploads folder. The purge command clears references after that folder has been archived or emptied.
 
 == Installation ==
 
@@ -45,6 +45,10 @@ Kilobyte works with locally available uploads. When a CDN or offload plugin chan
 = Do I need to clear my site cache after restoring images? =
 
 Restore switches new page requests to the original files. Kilobyte keeps the old copies available for at least 24 hours so cached pages can still display them. WordPress removes the copies in the background once it can read the originals. Clear affected cached pages after restoring if your cache can keep them for more than a day. Cache integrations can listen to `kilobyte_io_variant_changed`, which passes the attachment ID.
+
+= What happens when I uninstall Kilobyte? =
+
+New pages load the files in your Media Library. Uninstall removes your Kilobyte preferences and pauses scheduled cleanup. Generated copies and their recovery records stay in place, so older cached pages can still use those copies. If you want WordPress to remove generated copies, use **Restore all** before uninstalling and leave Kilobyte active while WordPress runs its scheduled cleanup. If you reinstall Kilobyte, cleanup for restored images resumes as each site loads.
 
 == Development ==
 

@@ -11,6 +11,7 @@ namespace Kilobyte\ImageOptimizer\Infrastructure\WordPress;
 
 use Kilobyte\ImageOptimizer\Domain\Repository\ServerCompressorInterface;
 use Kilobyte\ImageOptimizer\Domain\ValueObject\ImageFormat;
+use Kilobyte\ImageOptimizer\Domain\ValueObject\OptimizationRecord;
 use Kilobyte\ImageOptimizer\Domain\ValueObject\OptimizationSettings;
 
 /**
@@ -28,7 +29,7 @@ final class WpImageEditorCompressor implements ServerCompressorInterface {
 	 */
 	public function compress_to_temp( string $source_file, string $source_mime, OptimizationSettings $settings ): array {
 		if ( 'image/gif' === $source_mime && ImageFormat::ORIGINAL === $settings->format()->value() ) {
-			return array( 'skip_reason' => 'original_format_kept' );
+			return array( 'skip_reason' => OptimizationRecord::STATUS_ORIGINAL_FORMAT_KEPT );
 		}
 
 		if ( ! WpRasterImage::is_bounded( $source_file, $source_mime ) ) {
@@ -36,7 +37,8 @@ final class WpImageEditorCompressor implements ServerCompressorInterface {
 		}
 
 		if ( WpRasterImage::is_animated( $source_file, $source_mime ) ) {
-			return array( 'skip_reason' => 'animated' );
+			// An unrecognized GIF structure must never be recorded as proven animation.
+			return array( 'skip_reason' => 'image/gif' === $source_mime && ! WpRasterImage::has_gif_animation( $source_file ) ? 'gif_canvas_kept' : OptimizationRecord::STATUS_ANIMATED );
 		}
 
 		$editor = wp_get_image_editor( $source_file );

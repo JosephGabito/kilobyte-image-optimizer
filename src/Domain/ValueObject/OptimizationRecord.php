@@ -14,12 +14,14 @@ namespace Kilobyte\ImageOptimizer\Domain\ValueObject;
  */
 final class OptimizationRecord {
 
-	public const STATUS_OPTIMIZED       = 'optimized';
-	public const STATUS_ALREADY_OPTIMAL = 'already_optimal';
-	public const ENGINE_BROWSER         = 'browser';
-	public const ENGINE_SERVER          = 'server';
-	public const MODE_IN_PLACE          = 'in_place';
-	public const MODE_SIBLING           = 'sibling';
+	public const STATUS_OPTIMIZED            = 'optimized';
+	public const STATUS_ALREADY_OPTIMAL      = 'already_optimal';
+	public const STATUS_ANIMATED             = 'animated';
+	public const STATUS_ORIGINAL_FORMAT_KEPT = 'original_format_kept';
+	public const ENGINE_BROWSER              = 'browser';
+	public const ENGINE_SERVER               = 'server';
+	public const MODE_IN_PLACE               = 'in_place';
+	public const MODE_SIBLING                = 'sibling';
 
 	/**
 	 * Original byte size.
@@ -76,6 +78,9 @@ final class OptimizationRecord {
 	/** @var string */
 	private string $source_revision;
 
+	/** @var array<string, string> */
+	private array $thumbnail_stamps;
+
 	/**
 	 * Relative sibling variant path inside uploads directory (for non-destructive format conversion).
 	 *
@@ -127,7 +132,8 @@ final class OptimizationRecord {
 	 * @param int    $backup_bytes   Backup size in bytes.
 	 * @param array<string, int> $variant_widths Width of each generated file.
 	 * @param array<string, string> $variants   Source paths mapped to generated files.
-	 * @param string                $source_revision Original file revision for GIF copies.
+	 * @param string                $source_revision Original file revision.
+	 * @param array<string, string> $thumbnail_stamps Revisions of original sub-size files.
 	 */
 	public function __construct(
 		int $original_size,
@@ -143,22 +149,24 @@ final class OptimizationRecord {
 		int $backup_bytes = 0,
 		array $variants = array(),
 		array $variant_widths = array(),
-		string $source_revision = ''
+		string $source_revision = '',
+		array $thumbnail_stamps = array()
 	) {
-		$this->original_size   = max( 0, $original_size );
-		$this->optimized_size  = max( 0, $optimized_size );
-		$this->format          = $format;
-		$this->original_name   = $original_name;
-		$this->backup_path     = $backup_path;
-		$this->optimized_at    = $optimized_at;
-		$this->status          = $status;
-		$this->engine          = $engine;
-		$this->delivery_mode   = self::MODE_SIBLING === $delivery_mode ? self::MODE_SIBLING : self::MODE_IN_PLACE;
-		$this->variant_path    = $variant_path;
-		$this->backup_bytes    = '' !== $backup_path ? max( 0, $backup_bytes ) : 0;
-		$this->variants        = $variants;
-		$this->variant_widths  = $variant_widths;
-		$this->source_revision = $source_revision;
+		$this->original_size    = max( 0, $original_size );
+		$this->optimized_size   = max( 0, $optimized_size );
+		$this->format           = $format;
+		$this->original_name    = $original_name;
+		$this->backup_path      = $backup_path;
+		$this->optimized_at     = $optimized_at;
+		$this->status           = $status;
+		$this->engine           = $engine;
+		$this->delivery_mode    = self::MODE_SIBLING === $delivery_mode ? self::MODE_SIBLING : self::MODE_IN_PLACE;
+		$this->variant_path     = $variant_path;
+		$this->backup_bytes     = '' !== $backup_path ? max( 0, $backup_bytes ) : 0;
+		$this->variants         = $variants;
+		$this->variant_widths   = $variant_widths;
+		$this->source_revision  = $source_revision;
+		$this->thumbnail_stamps = $thumbnail_stamps;
 	}
 
 	/**
@@ -185,7 +193,8 @@ final class OptimizationRecord {
 			isset( $data['backup_bytes'] ) ? (int) $data['backup_bytes'] : 0,
 			isset( $data['variants'] ) && is_array( $data['variants'] ) ? array_filter( $data['variants'], 'is_string' ) : array(),
 			isset( $data['variant_widths'] ) && is_array( $data['variant_widths'] ) ? array_filter( $data['variant_widths'], 'is_int' ) : array(),
-			is_string( $data['source_revision'] ?? null ) ? $data['source_revision'] : ''
+			is_string( $data['source_revision'] ?? null ) ? $data['source_revision'] : '',
+			isset( $data['thumbnail_stamps'] ) && is_array( $data['thumbnail_stamps'] ) ? array_filter( $data['thumbnail_stamps'], 'is_string' ) : array()
 		);
 	}
 
@@ -196,21 +205,22 @@ final class OptimizationRecord {
 	 */
 	public function to_array(): array {
 		return array(
-			'original_size'   => $this->original_size,
-			'optimized_size'  => $this->optimized_size,
-			'saved_bytes'     => $this->saved_bytes(),
-			'format'          => $this->format,
-			'original_name'   => $this->original_name,
-			'backup_path'     => $this->backup_path,
-			'backup_bytes'    => $this->backup_bytes,
-			'variant_path'    => $this->variant_path,
-			'variants'        => $this->variants,
-			'variant_widths'  => $this->variant_widths,
-			'source_revision' => $this->source_revision,
-			'delivery_mode'   => $this->delivery_mode,
-			'optimized_at'    => $this->optimized_at,
-			'status'          => $this->status,
-			'engine'          => $this->engine,
+			'original_size'    => $this->original_size,
+			'optimized_size'   => $this->optimized_size,
+			'saved_bytes'      => $this->saved_bytes(),
+			'format'           => $this->format,
+			'original_name'    => $this->original_name,
+			'backup_path'      => $this->backup_path,
+			'backup_bytes'     => $this->backup_bytes,
+			'variant_path'     => $this->variant_path,
+			'variants'         => $this->variants,
+			'variant_widths'   => $this->variant_widths,
+			'source_revision'  => $this->source_revision,
+			'thumbnail_stamps' => $this->thumbnail_stamps,
+			'delivery_mode'    => $this->delivery_mode,
+			'optimized_at'     => $this->optimized_at,
+			'status'           => $this->status,
+			'engine'           => $this->engine,
 		);
 	}
 
@@ -224,10 +234,31 @@ final class OptimizationRecord {
 	}
 
 	/**
+	 * @return string UTC time the copy was created.
+	 */
+	public function optimized_at(): string {
+		return $this->optimized_at;
+	}
+
+	/**
+	 * @return string Stored optimization status.
+	 */
+	public function status(): string {
+		return $this->status;
+	}
+
+	/**
 	 * @return string
 	 */
 	public function source_revision(): string {
 		return $this->source_revision;
+	}
+
+	/**
+	 * @return array<string, string> Original sub-size revisions by upload-relative path.
+	 */
+	public function thumbnail_stamps(): array {
+		return $this->thumbnail_stamps;
 	}
 
 	/**
@@ -364,6 +395,15 @@ final class OptimizationRecord {
 	 */
 	public function is_already_optimal(): bool {
 		return self::STATUS_ALREADY_OPTIMAL === $this->status;
+	}
+
+	/**
+	 * Whether the check kept the source and produced no new file.
+	 *
+	 * @return bool
+	 */
+	public function is_unchanged(): bool {
+		return in_array( $this->status, array( self::STATUS_ALREADY_OPTIMAL, self::STATUS_ANIMATED, self::STATUS_ORIGINAL_FORMAT_KEPT ), true );
 	}
 
 	/**

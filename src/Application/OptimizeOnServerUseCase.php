@@ -100,7 +100,7 @@ final class OptimizeOnServerUseCase {
 		}
 
 		$existing = $this->attachments->get_record( $id );
-		if ( null !== $existing && ! $existing->is_already_optimal() ) {
+		if ( null !== $existing && ! $existing->is_unchanged() ) {
 			return array(
 				'id'      => $id,
 				'skipped' => true,
@@ -115,6 +115,9 @@ final class OptimizeOnServerUseCase {
 			return new OperationFailure( OperationFailure::ENCODE_FAILED, $encoded['error'] );
 		}
 		if ( isset( $encoded['skip_reason'] ) ) {
+			if ( ! empty( $image['source_revision'] ) && in_array( $encoded['skip_reason'], array( OptimizationRecord::STATUS_ANIMATED, OptimizationRecord::STATUS_ORIGINAL_FORMAT_KEPT ), true ) ) {
+				return $this->save_variant->record_unchanged( $image, OptimizationRecord::ENGINE_SERVER, $encoded['skip_reason'] );
+			}
 			return array(
 				'id'      => $id,
 				'skipped' => true,

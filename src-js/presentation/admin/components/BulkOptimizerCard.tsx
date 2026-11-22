@@ -81,6 +81,8 @@ export function BulkOptimizerCard( {
 	const isRetryState = ( phase === 'completed_with_errors' || phase === 'stopped' ) && ( failedCount > 0 || hasMore );
 	const primaryLabel = isRetryState && ( phase === 'stopped' || hasMore )
 		? __( 'Continue processing images', 'kilobyte-image-optimizer' )
+		: ! isRetryState && ! running && stats?.remaining_count === 0
+		? __( 'Check for new or changed images', 'kilobyte-image-optimizer' )
 		: getPrimaryOptimizeLabel( ! isRetryState && phase === 'stopped' ? 'idle' : phase, activeMode, failedCount );
 
 	const handleCopySummary = async () => {
@@ -142,10 +144,7 @@ export function BulkOptimizerCard( {
 							__next40pxDefaultSize
 							icon={ isRetryState ? update : image }
 							isBusy={ activeMode === 'optimize' }
-							disabled={
-								disabled || running ||
-								( ! isRetryState && stats !== null && stats.remaining_count === 0 )
-							}
+							disabled={ disabled || running }
 							onClick={ () => ( isRetryState ? onRetryFailed() : onStart( 'optimize' ) ) }
 						>
 							{ primaryLabel }
@@ -209,7 +208,7 @@ export function BulkOptimizerCard( {
 						</Surface>
 					) }
 
-					<ActivityList items={ logs } />
+					<ActivityList items={ logs } skippedByReason={ lastSummary?.skippedByReason } />
 				</VStack>
 			</CardBody>
 

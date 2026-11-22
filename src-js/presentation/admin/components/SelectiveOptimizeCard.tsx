@@ -44,6 +44,7 @@ interface SelectiveOptimizeCardProps {
 	progress: BulkProgress | null;
 	elapsedSeconds: number;
 	logs: LogEntry[];
+	skippedByReason?: Record< string, number >;
 	onStart: ( items: QueueItem[], retry: boolean ) => void;
 	onStop: () => void;
 	onClear: () => void;
@@ -66,6 +67,7 @@ export function SelectiveOptimizeCard( {
 	progress,
 	elapsedSeconds,
 	logs,
+	skippedByReason,
 	onStart,
 	onStop,
 	onClear,
@@ -330,7 +332,7 @@ export function SelectiveOptimizeCard( {
 						</VStack>
 					) }
 
-					{ logs.length > 0 && <ActivityList items={ logs } /> }
+					{ logs.length > 0 && <ActivityList items={ logs } skippedByReason={ skippedByReason } /> }
 				</VStack>
 			</CardBody>
 		</Card>

@@ -142,21 +142,44 @@ export function App() {
 	const activeQueue = activeJob === 'bulk' ? bulk : activeJob === 'selective' ? selective : null;
 
 	const handleSaveSettings = async () => {
+		if ( saving ) {
+			return;
+		}
 		setSaving( true );
 		setNotice( null );
 		try {
-			const updated = await wpRestClient.saveSettings( settings );
+			// Send only edited values so site-enforced settings do not overwrite saved preferences.
+			const changes = Object.fromEntries(
+				Object.entries( settings ).filter( ( [ key, value ] ) => value !== savedSettings[ key as keyof PluginSettings ] )
+			) as Partial< PluginSettings >;
+			const updated = await wpRestClient.saveSettings( changes );
+			const overridden = Object.entries( changes ).some( ( [ key, value ] ) => value !== updated[ key as keyof PluginSettings ] );
 			if ( window.KilobyteIOUploadConfig ) {
 				window.KilobyteIOUploadConfig.settings = updated;
 			}
 			setSettings( updated );
 			setSavedSettings( updated );
 			setNotice( {
-				status: 'success',
-				message: __( 'Preference saved.', 'kilobyte-image-optimizer' ),
+				status: overridden ? 'info' : 'success',
+				message: overridden
+					? __( 'Preference saved. Some values were adjusted. The active values are shown here.', 'kilobyte-image-optimizer' )
+					: __( 'Preference saved.', 'kilobyte-image-optimizer' ),
 			} );
+			if ( updated.format !== savedSettings.format ) {
+				void refreshStats();
+			}
 		} catch ( err ) {
-			setErrorNotice( err );
+			const parsed = toFriendlyError( err );
+			setNotice( {
+				status: 'error',
+				message: __( 'Could not save your preferences. Your changes are still here.', 'kilobyte-image-optimizer' ),
+				action: parsed.code === 'permission_denied'
+					? __( 'Sign in again and retry. If it still fails, ask your site administrator for help.', 'kilobyte-image-optimizer' )
+					: parsed.code === 'settings_save_failed' || parsed.code === 'network_error'
+						? parsed.action
+						: __( 'Try again. If the problem continues, share the details below with your site administrator.', 'kilobyte-image-optimizer' ),
+				technical: parsed.technical,
+			} );
 		} finally {
 			setSaving( false );
 		}
@@ -281,6 +304,7 @@ export function App() {
 									progress={ selective.progress }
 									elapsedSeconds={ elapsedSeconds }
 									logs={ selective.logs }
+									skippedByReason={ selective.lastSummary?.skippedByReason }
 									onStart={ ( items, retry ) => selective.run( 'optimize', items, retry ) }
 									onStop={ selective.stop }
 									onClear={ selective.clearResults }

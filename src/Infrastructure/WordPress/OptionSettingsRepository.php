@@ -25,12 +25,7 @@ final class OptionSettingsRepository implements SettingsRepositoryInterface {
 	 * @return OptimizationSettings
 	 */
 	public function load(): OptimizationSettings {
-		$saved = get_option( self::OPTION_NAME, array() );
-		if ( ! is_array( $saved ) ) {
-			$saved = array();
-		}
-
-		$merged = OptimizationSettings::from_array( $saved )->to_array();
+		$merged = $this->load_saved()->to_array();
 
 		/**
 		 * Filter active Kilobyte optimization settings (e.g. agency blueprint lock).
@@ -42,14 +37,24 @@ final class OptionSettingsRepository implements SettingsRepositoryInterface {
 		return OptimizationSettings::from_array( is_array( $filtered ) ? $filtered : $merged );
 	}
 
+	/** Load the saved values without applying the agency filter. */
+	public function load_saved(): OptimizationSettings {
+		$saved = get_option( self::OPTION_NAME, array() );
+		return OptimizationSettings::from_array( is_array( $saved ) ? $saved : array() );
+	}
+
 	/**
 	 * Persist optimization settings.
 	 *
 	 * @param OptimizationSettings $settings Settings to persist.
-	 * @return void
+	 * @return bool Whether the requested values were saved.
 	 */
-	public function save( OptimizationSettings $settings ): void {
-		update_option( self::OPTION_NAME, $settings->to_array() );
+	public function save( OptimizationSettings $settings ): bool {
+		$values = $settings->to_array();
+		if ( update_option( self::OPTION_NAME, $values ) ) {
+			return true;
+		}
+		return $this->load_saved()->to_array() === $values;
 	}
 
 	/**

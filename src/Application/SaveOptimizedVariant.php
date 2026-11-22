@@ -72,8 +72,13 @@ final class SaveOptimizedVariant {
 			0,
 			$variant['variants'],
 			$variant['widths'],
-			$image['source_revision'] ?? ''
+			$image['source_revision'] ?? '',
+			$variant['thumbnail_stamps']
 		);
+		if ( ! $this->source_is_current( $image ) ) {
+			$this->attachments->delete_sibling_variant( $id, $record );
+			return new OperationFailure( OperationFailure::SOURCE_CHANGED );
+		}
 		if ( ! $this->attachments->save_record( $id, $record ) ) {
 			$this->attachments->delete_sibling_variant( $id, $record );
 			return new OperationFailure( OperationFailure::WRITE_FAILED );
@@ -95,13 +100,17 @@ final class SaveOptimizedVariant {
 		);
 	}
 	/**
-	 * Record a file that did not benefit from compression.
+	 * Record a checked source that should stay unchanged.
 	 *
 	 * @param array<string, mixed> $image  Source image.
 	 * @param string               $engine Encoder.
+	 * @param string               $status Why the source was kept.
 	 * @return array<string, mixed>|OperationFailure
 	 */
-	public function record_unchanged( array $image, string $engine ) {
+	public function record_unchanged( array $image, string $engine, string $status = OptimizationRecord::STATUS_ALREADY_OPTIMAL ) {
+		if ( ! $this->source_is_current( $image ) ) {
+			return new OperationFailure( OperationFailure::SOURCE_CHANGED );
+		}
 		$id     = (int) $image['id'];
 		$size   = (int) $image['file_size'];
 		$record = new OptimizationRecord(
@@ -111,8 +120,14 @@ final class SaveOptimizedVariant {
 			$image['filename'],
 			'',
 			gmdate( 'Y-m-d H:i:s' ),
-			OptimizationRecord::STATUS_ALREADY_OPTIMAL,
-			$engine
+			$status,
+			$engine,
+			OptimizationRecord::MODE_IN_PLACE,
+			'',
+			0,
+			array(),
+			array(),
+			$image['source_revision']
 		);
 		if ( ! $this->attachments->save_record( $id, $record ) ) {
 			return new OperationFailure( OperationFailure::WRITE_FAILED );
@@ -120,7 +135,18 @@ final class SaveOptimizedVariant {
 		return array(
 			'id'      => $id,
 			'skipped' => true,
-			'status'  => OptimizationRecord::STATUS_ALREADY_OPTIMAL,
+			'status'  => $status,
 		);
+	}
+
+	/**
+	 * Recheck the source immediately before a record is published.
+	 *
+	 * @param array<string, mixed> $image Source seen at the start of the operation.
+	 * @return bool
+	 */
+	private function source_is_current( array $image ): bool {
+		$current = $this->attachments->find_image( (int) $image['id'], true );
+		return ! empty( $image['source_revision'] ) && ( $current['source_revision'] ?? '' ) === $image['source_revision'] && $current['file'] === $image['file'];
 	}
 }

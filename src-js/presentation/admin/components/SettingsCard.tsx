@@ -78,6 +78,7 @@ export function SettingsCard( {
 				</HStack>
 			</CardHeader>
 
+			<fieldset disabled={ saving } style={ { border: 0, margin: 0, padding: 0, minWidth: 0 } }>
 			<CardBody>
 				<VStack spacing={ 5 }>
 					<ToggleControl
@@ -207,9 +208,9 @@ export function SettingsCard( {
 
 					<ToggleControl
 						__nextHasNoMarginBottom
-						label={ __( 'Speed up page loading', 'kilobyte-image-optimizer' ) }
+						label={ __( 'Add image decoding hints', 'kilobyte-image-optimizer' ) }
 						help={ __(
-							'Load the main image first and let lower images load in the background.',
+							'Suggests that browsers decode images in the background.',
 							'kilobyte-image-optimizer'
 						) }
 						checked={ settings.cwv_enhancements }
@@ -217,6 +218,7 @@ export function SettingsCard( {
 					/>
 				</VStack>
 			</PanelBody>
+			</fieldset>
 
 			<CardFooter justify="flex-end">
 				<Button

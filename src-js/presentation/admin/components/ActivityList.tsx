@@ -12,22 +12,24 @@ import {
 } from '@wordpress/components';
 import { caution, check, chevronLeft, chevronRight, info } from '@wordpress/icons';
 import type { LogEntry } from '../../../domain/types';
+import { optimizationSkip } from '../../optimizationSkip';
 
 interface ActivityListProps {
 	items: LogEntry[];
+	skippedByReason?: Record< string, number >;
 }
 
 const PAGE_SIZE = 5;
 
-export function ActivityList( { items }: ActivityListProps ) {
-	const [ filter, setFilter ] = useState< 'all' | 'error' >( 'all' );
+export function ActivityList( { items, skippedByReason }: ActivityListProps ) {
+	const [ filter, setFilter ] = useState< 'all' | 'error' | 'muted' >( 'all' );
 	const [ page, setPage ] = useState( 1 );
 
 	const errorCount = items.filter( ( row ) => row.tone === 'error' ).length;
-	const filtered =
-		filter === 'error'
-			? items.filter( ( row ) => row.tone === 'error' )
-			: items;
+	const skippedCount = items.reduce( ( count, row ) => count + ( row.tone === 'muted' ? row.count ?? 1 : 0 ), 0 );
+	const skipTotals = Object.entries( skippedByReason ?? {} );
+	const allSkips = skipTotals.reduce( ( count, [ , total ] ) => count + total, 0 );
+	const filtered = filter === 'all' ? items : items.filter( ( row ) => row.tone === filter );
 
 	const totalPages = Math.max( 1, Math.ceil( filtered.length / PAGE_SIZE ) );
 	const safePage = Math.min( page, totalPages );
@@ -35,10 +37,10 @@ export function ActivityList( { items }: ActivityListProps ) {
 	const visible = filtered.slice( start, start + PAGE_SIZE );
 
 	useEffect( () => {
-		if ( filter === 'error' && errorCount === 0 ) {
+		if ( ( filter === 'error' && errorCount === 0 ) || ( filter === 'muted' && skippedCount === 0 ) ) {
 			setFilter( 'all' );
 		}
-	}, [ filter, errorCount ] );
+	}, [ filter, errorCount, skippedCount ] );
 
 	useEffect( () => {
 		setPage( 1 );
@@ -50,7 +52,22 @@ export function ActivityList( { items }: ActivityListProps ) {
 
 	return (
 		<VStack spacing={ 2 }>
-			{ ( errorCount > 0 || totalPages > 1 ) && (
+			{ allSkips > skippedCount && (
+				<VStack spacing={ 1 }>
+					<Text size={ 13 } weight={ 600 }>{ __( 'Skipped images from the full run', 'kilobyte-image-optimizer' ) }</Text>
+					{ skipTotals.map( ( [ reason, total ] ) => (
+						<Text key={ reason } size={ 12 }>
+							{ sprintf(
+								/* translators: 1: Number of images. 2: Reason images were skipped. */
+								__( '%1$d · %2$s', 'kilobyte-image-optimizer' ),
+								total,
+								optimizationSkip( reason ).subtitle
+							) }
+						</Text>
+					) ) }
+				</VStack>
+			) }
+			{ ( errorCount > 0 || skippedCount > 0 || totalPages > 1 ) && (
 				<HStack justify="space-between" alignment="center" wrap>
 					<HStack spacing={ 1 } expanded={ false }>
 						<Button
@@ -76,6 +93,19 @@ export function ActivityList( { items }: ActivityListProps ) {
 									/* translators: %d: failed item count */
 									__( 'Failed (%d)', 'kilobyte-image-optimizer' ),
 									errorCount
+								) }
+							</Button>
+						) }
+						{ skippedCount > 0 && (
+							<Button
+								variant={ filter === 'muted' ? 'secondary' : 'tertiary' }
+								size="compact"
+								onClick={ () => setFilter( 'muted' ) }
+							>
+								{ sprintf(
+									/* translators: %d: skipped activity count. */
+									__( 'Skipped (%d)', 'kilobyte-image-optimizer' ),
+									skippedCount
 								) }
 							</Button>
 						) }

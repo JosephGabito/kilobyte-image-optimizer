@@ -97,7 +97,7 @@ function kilobyte_io_bootstrap(): void {
 	$retirement       = new WpVariantRetirement( $attachment_repo );
 	$restore          = new RestoreAttachmentUseCase( $attachment_repo, $events, $backup_storage, $retirement );
 	$regenerate       = new RegenerateThumbnailsUseCase( $attachment_repo );
-	$mark_optimal     = new MarkAlreadyOptimalUseCase( $attachment_repo );
+	$mark_optimal     = new MarkAlreadyOptimalUseCase( $attachment_repo, $events, $save_variant );
 	$purge_backups    = new PurgeBackupsUseCase( $backup_storage, $attachment_repo );
 
 	$rest_controller = new OptimizerRestController(
@@ -139,6 +139,7 @@ function kilobyte_io_bootstrap(): void {
 	$media_hooks->register();
 	$frontend_serve->register();
 	add_action( WpVariantRetirement::EVENT, array( $retirement, 'clean_due_files' ) );
+	kilobyte_io_resume_cleanup();
 	$admin_page->register();
 	$cli_command->register();
 }
@@ -151,8 +152,26 @@ add_action( 'plugins_loaded', 'kilobyte_io_bootstrap' );
  */
 function kilobyte_io_activate(): void {
 	( new OptionSettingsRepository() )->ensure_defaults();
+	kilobyte_io_resume_cleanup();
 }
 register_activation_hook( __FILE__, 'kilobyte_io_activate' );
+
+/**
+ * Resume scheduled cleanup for this site after reinstalling the plugin.
+ *
+ * @return void
+ */
+function kilobyte_io_resume_cleanup(): void {
+	$option = 'kilobyte_io_resume_cleanup';
+	if ( ! get_option( $option ) ) {
+		return;
+	}
+
+	$hook = WpVariantRetirement::EVENT;
+	if ( wp_next_scheduled( $hook ) || wp_schedule_event( time() + HOUR_IN_SECONDS, 'hourly', $hook ) ) {
+		delete_option( $option );
+	}
+}
 
 /**
  * Add direct Optimize images link in the Plugins list.

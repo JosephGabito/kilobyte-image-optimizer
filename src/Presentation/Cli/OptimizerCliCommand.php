@@ -135,12 +135,18 @@ final class OptimizerCliCommand {
 	public function optimize( array $args, array $assoc_args ): void {
 		$limit     = isset( $assoc_args['limit'] ) ? max( 1, absint( $assoc_args['limit'] ) ) : 100;
 		$processed = 0;
+		$failed    = 0;
 		$saved_sum = 0;
 		$before    = 0;
 
 		while ( $processed < $limit ) {
-			$batch = $this->attachments->get_queue_page( 'optimize', $before, 50, false );
-			$items = is_array( $batch['items'] ) ? $batch['items'] : array();
+			$batch   = $this->attachments->get_queue_page( 'optimize', $before, min( 50, $limit - $processed ), false );
+			$items   = is_array( $batch['items'] ) ? $batch['items'] : array();
+			$missing = (int) ( $batch['skipped_missing'] ?? 0 );
+			if ( $missing > 0 ) {
+				WP_CLI::log( sprintf( 'Skipped %d unavailable files. Check that WordPress can read your media storage.', $missing ) );
+				$processed += $missing;
+			}
 
 			foreach ( $items as $item ) {
 				if ( $processed >= $limit ) {
@@ -148,9 +154,10 @@ final class OptimizerCliCommand {
 				}
 				$result = $this->optimize_server->execute( (int) $item['id'] );
 				if ( $result instanceof OperationFailure ) {
+					++$failed;
 					WP_CLI::warning( sprintf( '#%d %s: %s', (int) $item['id'], (string) $item['filename'], OperationErrorMessage::to_wp_error( $result )->get_error_message() ) );
 				} elseif ( ! empty( $result['skipped'] ) ) {
-					WP_CLI::log( sprintf( '#%d %s: skipped', (int) $item['id'], (string) $item['filename'] ) );
+					WP_CLI::log( sprintf( '#%d %s: %s', (int) $item['id'], (string) $item['filename'], OperationErrorMessage::describe_skip( (string) ( $result['status'] ?? '' ) ) ) );
 				} else {
 					$saved_sum += (int) $result['saved_bytes'];
 					WP_CLI::log(
@@ -172,6 +179,10 @@ final class OptimizerCliCommand {
 			$before = (int) $batch['next_before'];
 		}
 
+		if ( $failed > 0 ) {
+			WP_CLI::error( sprintf( 'Processed %d images; %d failed. Estimated transfer savings: %s.', $processed, $failed, (string) size_format( $saved_sum, 1 ) ) );
+			return;
+		}
 		WP_CLI::success( sprintf( 'Processed %d images. Estimated transfer savings: %s.', $processed, (string) size_format( $saved_sum, 1 ) ) );
 	}
 
@@ -198,6 +209,7 @@ final class OptimizerCliCommand {
 	public function restore( array $args, array $assoc_args ): void {
 		if ( ! empty( $assoc_args['all'] ) ) {
 			$restored = 0;
+			$failed   = 0;
 			$before   = 0;
 			while ( true ) {
 				$batch = $this->attachments->get_queue_page( 'restore', $before, 50, false );
@@ -205,7 +217,8 @@ final class OptimizerCliCommand {
 				foreach ( $items as $item ) {
 					$res = $this->restore->execute( (int) $item['id'] );
 					if ( $res instanceof OperationFailure ) {
-						WP_CLI::warning( OperationErrorMessage::to_wp_error( $res )->get_error_message() );
+						++$failed;
+						WP_CLI::warning( sprintf( '#%d: %s', (int) $item['id'], OperationErrorMessage::to_wp_error( $res )->get_error_message() ) );
 					} else {
 						$this->report_restore_details( (int) $item['id'], $res );
 						++$restored;
@@ -215,6 +228,10 @@ final class OptimizerCliCommand {
 					break;
 				}
 				$before = (int) $batch['next_before'];
+			}
+			if ( $failed > 0 ) {
+				WP_CLI::error( sprintf( 'Restored %d images; %d failed.', $restored, $failed ) );
+				return;
 			}
 			WP_CLI::success( sprintf( 'Restored %d images.', $restored ) );
 			return;

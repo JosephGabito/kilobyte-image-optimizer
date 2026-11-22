@@ -89,7 +89,7 @@ interface AttachmentRepositoryInterface {
 	 * @param string $target_mime     Target MIME type.
 	 * @param string $target_ext      Target extension (webp or avif).
 	 * @param OptimizationSettings $settings Image settings.
-	 * @return array{variant_path: string, size: int, variants: array<string, string>, widths: array<string, int>}|null
+	 * @return array{variant_path: string, size: int, variants: array<string, string>, widths: array<string, int>, thumbnail_stamps: array<string, string>}|null
 	 */
 	public function save_sibling_variant(
 		int $attachment_id,

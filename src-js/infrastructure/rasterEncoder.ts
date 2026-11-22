@@ -1,7 +1,15 @@
 import { computeScaledDimensions } from '../domain/dimensions';
+import { assertBoundedRaster as checkRasterHeader } from './rasterHeader';
 
 export const MAX_IMAGE_BYTES = 24 * 1024 * 1024;
 export const MAX_IMAGE_PIXELS = 40_000_000;
+
+export async function assertBoundedRaster( file: File ): Promise< void > {
+	if ( ! file.size || file.size > MAX_IMAGE_BYTES ) {
+		throw new Error( 'image_too_large' );
+	}
+	await checkRasterHeader( file, MAX_IMAGE_PIXELS );
+}
 
 export interface EncodeRequest {
 	file: File;
@@ -11,17 +19,17 @@ export interface EncodeRequest {
 	quality: number;
 }
 
-function isStillGif( bytes: Uint8Array ): boolean {
+function gifFrameCount( bytes: Uint8Array ): number {
 	const header = String.fromCharCode( ...bytes.subarray( 0, 6 ) );
 	if ( bytes.length < 13 || ( header !== 'GIF87a' && header !== 'GIF89a' ) ) {
-		return false;
+		return 0;
 	}
 
 	const readSize = ( offset: number ) => bytes[ offset ] + bytes[ offset + 1 ] * 256;
 	const canvasWidth = readSize( 6 );
 	const canvasHeight = readSize( 8 );
 	if ( ! canvasWidth || ! canvasHeight || canvasWidth * canvasHeight > MAX_IMAGE_PIXELS ) {
-		return false;
+		return 0;
 	}
 	const colorTableSize = ( flags: number ) => ( flags & 0x80 ) ? 3 * ( 2 << ( flags & 7 ) ) : 0;
 	let offset = 13 + colorTableSize( bytes[ 10 ] );
@@ -29,25 +37,25 @@ function isStillGif( bytes: Uint8Array ): boolean {
 	while ( offset < bytes.length ) {
 		const block = bytes[ offset++ ];
 		if ( block === 0x3b ) {
-			return frames === 1 && offset === bytes.length;
+			return offset === bytes.length ? frames : 0;
 		}
 		if ( block === 0x2c ) {
 			frames += 1;
-			if ( frames > 1 || offset + 9 >= bytes.length ) {
-				return false;
+			if ( offset + 9 >= bytes.length ) {
+				return 0;
 			}
 			const width = readSize( offset + 4 );
 			const height = readSize( offset + 6 );
 			if ( ! width || ! height || readSize( offset ) + width > canvasWidth || readSize( offset + 2 ) + height > canvasHeight ) {
-				return false;
+				return 0;
 			}
 			// Image descriptor, local color table, and LZW minimum code size.
 			offset += 10 + colorTableSize( bytes[ offset + 8 ] );
-		} else if ( block === 0x21 && bytes[ offset ] !== 0x01 ) {
+		} else if ( block === 0x21 && offset < bytes.length && bytes[ offset ] !== 0x01 ) {
 			offset += 1;
 		} else {
 			// Plain text is also a rendering block. Keep the original if present.
-			return false;
+			return 0;
 		}
 
 		while ( offset < bytes.length ) {
@@ -58,12 +66,16 @@ function isStillGif( bytes: Uint8Array ): boolean {
 			offset += length;
 		}
 	}
-	return false;
+	return 0;
 }
 
 export async function isAnimated( file: File ): Promise< boolean > {
 	if ( file.type === 'image/gif' ) {
-		return ! isStillGif( new Uint8Array( await file.arrayBuffer() ) );
+		const frames = gifFrameCount( new Uint8Array( await file.arrayBuffer() ) );
+		if ( ! frames ) {
+			throw new Error( 'gif_structure_unreadable' );
+		}
+		return frames > 1;
 	}
 
 	if ( file.type === 'image/png' ) {
@@ -96,6 +108,7 @@ export async function encodeRaster(
 	canvasFor: ( width: number, height: number ) => HTMLCanvasElement | OffscreenCanvas
 ) {
 	const { file, maxWidth, maxHeight, mime, quality } = request;
+	await assertBoundedRaster( file );
 	const bitmap = await createImageBitmap( file );
 	try {
 		if ( file.type === 'image/gif' ) {

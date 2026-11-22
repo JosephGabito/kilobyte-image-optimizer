@@ -358,15 +358,14 @@ final class OptimizerRestController {
 			);
 		}
 
-		$params      = $request->get_body_params();
-		$source_hash = $params['source_hash'] ?? '';
-		$result      = $this->optimize_browser->execute(
+		$params = $request->get_body_params();
+		$result = $this->optimize_browser->execute(
 			$attachment_id,
 			$tmp_path,
 			$detected_mime,
 			(int) wp_filesize( $tmp_path ),
 			'1' === ( $params['preview'] ?? '' ),
-			is_string( $source_hash ) && preg_match( '/^[a-f0-9]{64}$/D', $source_hash ) ? $source_hash : ''
+			$this->parse_source_hash( $params['source_hash'] ?? '' )
 		);
 
 		return $result instanceof OperationFailure ? OperationErrorMessage::to_wp_error( $result ) : rest_ensure_response( $result );
@@ -390,8 +389,21 @@ final class OptimizerRestController {
 	 * @return WP_REST_Response|WP_Error
 	 */
 	public function mark_skipped( WP_REST_Request $request ) {
-		$result = $this->mark_optimal->execute( absint( $request->get_url_params()['id'] ?? 0 ) );
+		$result = $this->mark_optimal->execute(
+			absint( $request->get_url_params()['id'] ?? 0 ),
+			$this->parse_source_hash( $request->get_param( 'source_hash' ) )
+		);
 		return $result instanceof OperationFailure ? OperationErrorMessage::to_wp_error( $result ) : rest_ensure_response( $result );
+	}
+
+	/**
+	 * Read a SHA-256 fingerprint supplied by the browser.
+	 *
+	 * @param mixed $value Request value.
+	 * @return string Empty if invalid.
+	 */
+	private function parse_source_hash( $value ): string {
+		return is_string( $value ) && preg_match( '/^[a-f0-9]{64}$/D', $value ) ? $value : '';
 	}
 
 	/**
@@ -438,8 +450,10 @@ final class OptimizerRestController {
 			return new WP_Error( 'kilobyte_io_invalid_settings', __( 'Could not read these preferences.', 'kilobyte-image-optimizer' ), array( 'status' => 400 ) );
 		}
 
-		$settings = OptimizationSettings::from_array( array_replace( $this->settings->load()->to_array(), $params ) );
-		$this->settings->save( $settings );
+		$settings = OptimizationSettings::from_array( array_replace( $this->settings->load_saved()->to_array(), $params ) );
+		if ( ! $this->settings->save( $settings ) ) {
+			return new WP_Error( 'kilobyte_io_settings_save_failed', __( 'Could not save these preferences.', 'kilobyte-image-optimizer' ), array( 'status' => 500 ) );
+		}
 
 		return rest_ensure_response( $this->settings->load()->to_array() );
 	}

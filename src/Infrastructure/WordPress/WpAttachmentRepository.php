@@ -34,7 +34,7 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 	 * Return attachment metadata needed for processing, or null if invalid/outside uploads/missing.
 	 *
 	 * @param int  $attachment_id Attachment ID.
-	 * @param bool $for_encoding  Capture the GIF content fingerprint before publishing.
+	 * @param bool $for_encoding  Capture the source fingerprint before publishing.
 	 * @return array<string, mixed>|null
 	 */
 	public function find_image( int $attachment_id, bool $for_encoding = false ): ?array {
@@ -47,12 +47,19 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 			return null;
 		}
 
+		if ( $for_encoding ) {
+			clearstatcache( true, $file );
+		}
 		$bytes = (int) wp_filesize( $file );
 		$mime  = $bytes > 0 ? wp_get_image_mime( $file ) : false;
 		if ( ! is_string( $mime ) ) {
 			return null;
 		}
-		$source_hash = $for_encoding && 'image/gif' === $mime && $bytes <= WpRasterImage::MAX_BYTES ? $this->source_hash( $file ) : '';
+		$stamp       = $for_encoding && $bytes <= WpRasterImage::MAX_BYTES ? $this->source_stamp( $file ) : '';
+		$source_hash = '' !== $stamp ? $this->source_hash( $file ) : '';
+		if ( '' !== $source_hash && $stamp !== $this->source_stamp( $file ) ) {
+			$source_hash = '';
+		}
 		return array(
 			'id'              => $attachment_id,
 			'file'            => $file,
@@ -60,7 +67,7 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 			'mime_type'       => $mime,
 			'file_size'       => $bytes,
 			'source_hash'     => $source_hash,
-			'source_revision' => '' !== $source_hash ? $this->source_stamp( $file ) . '|' . $source_hash : '',
+			'source_revision' => '' !== $source_hash ? $stamp . '|' . $source_hash : '',
 		);
 	}
 
@@ -83,19 +90,40 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 	}
 
 	/**
-	 * Keep serving a GIF variant only while its original file remains the same.
+	 * Keep serving a variant only while its source remains the same.
 	 *
 	 * @param int                $attachment_id Attachment ID.
 	 * @param OptimizationRecord $record        Stored optimization.
 	 * @return array<string, string>
 	 */
 	public function delivery_variant_paths( int $attachment_id, OptimizationRecord $record ): array {
-		if ( '' !== $record->source_revision() || 'gif' === strtolower( pathinfo( $record->original_name(), PATHINFO_EXTENSION ) ) ) {
-			$file     = $this->resolve_safe_upload_file( get_attached_file( $attachment_id ) );
-			$revision = explode( '|', $record->source_revision(), 2 );
-			if ( null === $file || empty( $revision[0] ) || empty( $revision[1] ) || $this->source_stamp( $file ) !== $revision[0] ) {
+		$paths = $this->variant_paths( $attachment_id, $record );
+		if ( empty( $paths ) ) {
+			return array();
+		}
+
+		$is_gif = 'gif' === strtolower( pathinfo( $record->original_name(), PATHINFO_EXTENSION ) );
+		$file   = $this->resolve_safe_upload_file( get_attached_file( $attachment_id ) );
+		if ( null === $file ) {
+			// Keep using a copy when the same Media Library file has gone missing.
+			$attached = get_attached_file( $attachment_id, true );
+			if ( $is_gif || ! is_string( $attached ) || ( $paths[ _wp_relative_upload_path( $attached ) ] ?? '' ) !== $record->variant_path() ) {
 				return array();
 			}
+		} elseif ( '' === $record->source_revision() && ! $is_gif ) {
+			// Earlier records lack a fingerprint. A changed size or newer source rules the copy out.
+			$optimized_at = '' !== $record->optimized_at() ? strtotime( $record->optimized_at() . ' UTC' ) : false;
+			if ( (int) wp_filesize( $file ) !== $record->original_size() || ( false !== $optimized_at && WpLocalFilesystem::get()->mtime( $file ) > $optimized_at ) ) {
+				return array();
+			}
+		} else {
+			$revision = explode( '|', $record->source_revision(), 2 );
+			if ( empty( $revision[0] ) || empty( $revision[1] ) || $this->source_stamp( $file ) !== $revision[0] ) {
+				return array();
+			}
+		}
+		// Another media tool can replace a still GIF with an animation within one filesystem timestamp.
+		if ( $is_gif ) {
 			$size = (int) wp_filesize( $file );
 			if ( $size <= 0 || $size > $this->gif_delivery_bytes_left ) {
 				return array();
@@ -105,7 +133,14 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 				return array();
 			}
 		}
-		return $this->variant_paths( $attachment_id, $record );
+		$root = $this->uploads_root();
+		foreach ( array_intersect_key( $record->thumbnail_stamps(), $paths ) as $source => $stamp ) {
+			$current = null !== $root ? $this->source_stamp( $root . $source ) : '';
+			if ( '' !== $current && $current !== $stamp ) {
+				unset( $paths[ $source ] );
+			}
+		}
+		return $paths;
 	}
 
 	/**
@@ -120,6 +155,18 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 		// phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
 		$stats = @stat( $file );
 		return is_array( $stats ) ? implode( ':', array( $stats['ino'], $stats['size'], $stats['mtime'], $stats['ctime'] ) ) : '';
+	}
+
+	/**
+	 * Identify the current local file for a cached Media Library message.
+	 *
+	 * @param int $attachment_id Attachment ID.
+	 * @return string File identity that changes with the path or file attributes.
+	 */
+	public function attachment_source_stamp( int $attachment_id ): string {
+		$path = (string) get_attached_file( $attachment_id, true );
+		$file = $this->resolve_safe_upload_file( $path );
+		return hash( 'sha256', $path . '|' . ( null === $file ? '' : $this->source_stamp( $file ) ) );
 	}
 
 	/**
@@ -199,10 +246,11 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 	 * Acquire a lock which can span WordPress's attachment deletion hooks.
 	 *
 	 * @param int $attachment_id Attachment ID.
+	 * @param bool|null $available Whether the database answered the lock request.
 	 * @return callable|null
 	 */
-	public function acquire_attachment_lock( int $attachment_id ): ?callable {
-		$release = WpOperationLock::acquire( 'image:' . $attachment_id, 0 );
+	public function acquire_attachment_lock( int $attachment_id, ?bool &$available = null ): ?callable {
+		$release = WpOperationLock::acquire( 'image:' . $attachment_id, 0, $available );
 		if ( null !== $release ) {
 			wp_cache_delete( $attachment_id, 'post_meta' );
 		}
@@ -243,6 +291,7 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 					return false;
 				}
 				delete_post_meta( $attachment_id, '_kilobyte_io_auto_failure' );
+				delete_post_meta( $attachment_id, '_kilobyte_io_auto_skip' );
 				return true;
 			}
 		);
@@ -399,7 +448,7 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 	 * @param string $target_mime     Target MIME type.
 	 * @param string $target_ext      Target extension.
 	 * @param OptimizationSettings $settings Image settings.
-	 * @return array{variant_path: string, size: int, variants: array<string, string>, widths: array<string, int>}|null
+	 * @return array{variant_path: string, size: int, variants: array<string, string>, widths: array<string, int>, thumbnail_stamps: array<string, string>}|null
 	 */
 	public function save_sibling_variant(
 		int $attachment_id,
@@ -424,14 +473,16 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 			return null;
 		}
 
-		$relative = substr( $variant, strlen( $root ) );
-		$variants = array( substr( $original, strlen( $root ) ) => $relative );
-		$size     = wp_getimagesize( $variant );
-		$widths   = is_array( $size ) ? array( $relative => (int) $size[0] ) : array();
+		$relative         = substr( $variant, strlen( $root ) );
+		$variants         = array( substr( $original, strlen( $root ) ) => $relative );
+		$size             = wp_getimagesize( $variant );
+		$widths           = is_array( $size ) ? array( $relative => (int) $size[0] ) : array();
+		$thumbnail_stamps = array();
 
 		foreach ( $this->thumbnail_paths( $attachment_id, $original ) as $thumbnail ) {
+			$stamp       = $this->source_stamp( $thumbnail );
 			$source_mime = wp_get_image_mime( $thumbnail );
-			if ( ! is_string( $source_mime ) || ! WpRasterImage::is_bounded( $thumbnail, $source_mime ) || WpRasterImage::is_animated( $thumbnail, $source_mime ) ) {
+			if ( '' === $stamp || ! is_string( $source_mime ) || ! WpRasterImage::is_bounded( $thumbnail, $source_mime ) || WpRasterImage::is_animated( $thumbnail, $source_mime ) ) {
 				continue;
 			}
 			$editor = wp_get_image_editor( $thumbnail );
@@ -468,21 +519,24 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 				}
 				continue;
 			}
-			if ( wp_get_image_mime( $destination ) !== $target_mime || ( $settings->skip_smaller() && wp_filesize( $destination ) >= wp_filesize( $thumbnail ) ) ) {
+			if ( $stamp !== $this->source_stamp( $thumbnail ) || wp_get_image_mime( $destination ) !== $target_mime || ( $settings->skip_smaller() && wp_filesize( $destination ) >= wp_filesize( $thumbnail ) ) ) {
 				$filesystem->delete( $destination );
 				continue;
 			}
 
-			$variant_relative                                  = substr( $destination, strlen( $root ) );
-			$variants[ substr( $thumbnail, strlen( $root ) ) ] = $variant_relative;
-			$widths[ $variant_relative ]                       = (int) ( $saved['width'] ?? 0 );
+			$variant_relative                        = substr( $destination, strlen( $root ) );
+			$thumbnail_relative                      = substr( $thumbnail, strlen( $root ) );
+			$variants[ $thumbnail_relative ]         = $variant_relative;
+			$widths[ $variant_relative ]             = (int) ( $saved['width'] ?? 0 );
+			$thumbnail_stamps[ $thumbnail_relative ] = $stamp;
 		}
 
 		return array(
-			'variant_path' => $relative,
-			'size'         => (int) wp_filesize( $variant ),
-			'variants'     => $variants,
-			'widths'       => $widths,
+			'variant_path'     => $relative,
+			'size'             => (int) wp_filesize( $variant ),
+			'variants'         => $variants,
+			'widths'           => $widths,
+			'thumbnail_stamps' => $thumbnail_stamps,
 		);
 	}
 
@@ -871,6 +925,7 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 		$items    = array();
 		$missing  = 0;
 		$cursor   = 0;
+		$keep_gif = 'optimize' === $mode && $this->keeps_gif_format();
 
 		foreach ( $posts as $post ) {
 			$attachment_id = (int) $post->ID;
@@ -880,8 +935,10 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 			}
 
 			$record = $this->get_record( $attachment_id );
-			if ( 'optimize' === $mode && null !== $record ) {
-				continue;
+			if ( 'optimize' === $mode && null !== $record && ( $keep_gif || OptimizationRecord::STATUS_ORIGINAL_FORMAT_KEPT !== $record->status() ) ) {
+				if ( ! $record->is_unchanged() || '' === $record->source_revision() || $this->checked_source_has_same_stamp( $attachment_id, $record ) ) {
+					continue;
+				}
 			}
 			if ( 'restore' === $mode && ( null === $record || ! $record->is_restorable() ) ) {
 				continue;
@@ -981,7 +1038,8 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 		$total  = array_sum( array_intersect_key( $counts, array_flip( CompressionPolicy::SUPPORTED_SOURCE_MIMES ) ) );
 
 		$counters        = $this->load_counters();
-		$optimized_count = min( $total, $counters['optimized_count'] );
+		$pending_gifs    = $counters['original_format_count'] > 0 && ! $this->keeps_gif_format() ? $counters['original_format_count'] : 0;
+		$optimized_count = min( $total, max( 0, $counters['optimized_count'] - $pending_gifs ) );
 		$total_original  = $counters['total_original'];
 		$total_optimized = $counters['total_optimized'];
 		$total_saved     = max( 0, $total_original - $total_optimized );
@@ -999,6 +1057,27 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 			'restorable_count' => $counters['restorable_count'],
 			'needs_reconcile'  => (bool) get_option( self::RECONCILE_OPTION ),
 		);
+	}
+
+	/**
+	 * Determine whether the current preference leaves GIF files in their original format.
+	 *
+	 * @return bool
+	 */
+	private function keeps_gif_format(): bool {
+		return ImageFormat::ORIGINAL === ( new OptionSettingsRepository() )->load()->format()->value();
+	}
+
+	/**
+	 * Detect checked sources that changed outside WordPress's metadata hooks.
+	 *
+	 * @param int                $attachment_id Attachment ID.
+	 * @param OptimizationRecord $record        Completed check.
+	 * @return bool
+	 */
+	private function checked_source_has_same_stamp( int $attachment_id, OptimizationRecord $record ): bool {
+		$file = $this->resolve_safe_upload_file( get_attached_file( $attachment_id ) );
+		return null !== $file && $this->source_stamp( $file ) === explode( '|', $record->source_revision(), 2 )[0];
 	}
 
 	/**
@@ -1160,6 +1239,10 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 	 */
 	private function add_record( array $stats, OptimizationRecord $record ): array {
 		++$stats['optimized_count'];
+		if ( OptimizationRecord::STATUS_ORIGINAL_FORMAT_KEPT === $record->status() ) {
+			++$stats['original_format_count'];
+			return $stats;
+		}
 		$stats['total_original']  += $record->original_size();
 		$stats['total_optimized'] += $record->optimized_size();
 		if ( $record->has_backup() ) {
@@ -1181,6 +1264,10 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 	 */
 	private function subtract_record( array $stats, OptimizationRecord $record ): array {
 		$stats['optimized_count'] = max( 0, $stats['optimized_count'] - 1 );
+		if ( OptimizationRecord::STATUS_ORIGINAL_FORMAT_KEPT === $record->status() ) {
+			$stats['original_format_count'] = max( 0, $stats['original_format_count'] - 1 );
+			return $stats;
+		}
 		$stats['total_original']  = max( 0, $stats['total_original'] - $record->original_size() );
 		$stats['total_optimized'] = max( 0, $stats['total_optimized'] - $record->optimized_size() );
 		if ( $record->has_backup() ) {
@@ -1196,7 +1283,7 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 	/**
 	 * Load persisted incremental counters.
 	 *
-	 * @return array{optimized_count: int, total_original: int, total_optimized: int, backup_count: int, backup_bytes: int, restorable_count: int}
+	 * @return array{optimized_count: int, original_format_count: int, total_original: int, total_optimized: int, backup_count: int, backup_bytes: int, restorable_count: int}
 	 */
 	private function load_counters(): array {
 		$raw = get_option( self::STATS_OPTION, array() );
@@ -1205,12 +1292,13 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 		}
 
 		return array(
-			'optimized_count'  => isset( $raw['optimized_count'] ) ? max( 0, (int) $raw['optimized_count'] ) : 0,
-			'total_original'   => isset( $raw['total_original'] ) ? max( 0, (int) $raw['total_original'] ) : 0,
-			'total_optimized'  => isset( $raw['total_optimized'] ) ? max( 0, (int) $raw['total_optimized'] ) : 0,
-			'backup_count'     => isset( $raw['backup_count'] ) ? max( 0, (int) $raw['backup_count'] ) : 0,
-			'backup_bytes'     => isset( $raw['backup_bytes'] ) ? max( 0, (int) $raw['backup_bytes'] ) : 0,
-			'restorable_count' => isset( $raw['restorable_count'] ) ? max( 0, (int) $raw['restorable_count'] ) : 0,
+			'optimized_count'       => isset( $raw['optimized_count'] ) ? max( 0, (int) $raw['optimized_count'] ) : 0,
+			'original_format_count' => max( 0, (int) ( $raw['original_format_count'] ?? 0 ) ),
+			'total_original'        => isset( $raw['total_original'] ) ? max( 0, (int) $raw['total_original'] ) : 0,
+			'total_optimized'       => isset( $raw['total_optimized'] ) ? max( 0, (int) $raw['total_optimized'] ) : 0,
+			'backup_count'          => isset( $raw['backup_count'] ) ? max( 0, (int) $raw['backup_count'] ) : 0,
+			'backup_bytes'          => isset( $raw['backup_bytes'] ) ? max( 0, (int) $raw['backup_bytes'] ) : 0,
+			'restorable_count'      => isset( $raw['restorable_count'] ) ? max( 0, (int) $raw['restorable_count'] ) : 0,
 		);
 	}
 }

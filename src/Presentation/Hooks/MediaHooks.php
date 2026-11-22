@@ -27,6 +27,7 @@ final class MediaHooks {
 
 	private const NATIVE_PENDING = '_kilobyte_io_native_pending';
 	private const AUTO_FAILURE   = '_kilobyte_io_auto_failure';
+	private const AUTO_SKIP      = '_kilobyte_io_auto_skip';
 
 	/**
 	 * Settings repository.
@@ -91,13 +92,6 @@ final class MediaHooks {
 	private string $version;
 
 	/**
-	 * Whether LCP fetchpriority has been applied on this request.
-	 *
-	 * @var bool
-	 */
-	private bool $lcp_applied = false;
-
-	/**
 	 * Track brand-new upload IDs seen in add_attachment during this request.
 	 * Prevents thumbnail regeneration on existing attachments from entering the upload conversion path.
 	 *
@@ -154,6 +148,8 @@ final class MediaHooks {
 		add_filter( 'rest_request_before_callbacks', array( $this, 'enter_core_upload' ), 10, 3 );
 		add_filter( 'rest_request_after_callbacks', array( $this, 'leave_core_upload' ), 10, 3 );
 		add_action( 'add_attachment', array( $this, 'maybe_set_auto_alt_text' ) );
+		add_action( 'added_post_meta', array( $this, 'maybe_reset_image_check' ), 10, 3 );
+		add_action( 'updated_post_meta', array( $this, 'maybe_reset_image_check' ), 10, 3 );
 		add_filter( 'pre_delete_attachment', array( $this, 'before_delete_attachment' ), PHP_INT_MAX, 2 );
 		add_action( 'deleted_post', array( $this, 'after_delete_attachment' ), 10, 2 );
 		add_action( 'kilobyte_io_retry_variant_cleanup', array( $this, 'retry_variant_cleanup' ), 10, 2 );
@@ -239,11 +235,19 @@ final class MediaHooks {
 			return $delete;
 		}
 
-		$id      = $post->ID;
-		$key     = get_current_blog_id() . ':' . $id;
-		$release = $this->attachments->acquire_attachment_lock( $id );
+		$id        = $post->ID;
+		$key       = get_current_blog_id() . ':' . $id;
+		$available = null;
+		$release   = $this->attachments->acquire_attachment_lock( $id, $available );
 		if ( null === $release ) {
-			return false;
+			if ( $available ) {
+				return false;
+			}
+			// Allow Core deletion when the database cannot provide a lock. Leave all plugin files alone.
+			if ( null !== $this->attachments->get_record( $id ) ) {
+				update_option( WpAttachmentRepository::RECONCILE_OPTION, true, false );
+			}
+			return $delete;
 		}
 
 		$record = $this->attachments->get_record( $id );
@@ -422,8 +426,75 @@ final class MediaHooks {
 	private function optimize_upload( int $attachment_id ): void {
 		$result = $this->optimize_server->execute( $attachment_id );
 		if ( $result instanceof OperationFailure ) {
-			update_post_meta( $attachment_id, self::AUTO_FAILURE, $result->reason() );
+			$this->store_upload_status( $attachment_id, self::AUTO_FAILURE, $result->reason() );
+			delete_post_meta( $attachment_id, self::AUTO_SKIP );
+		} elseif ( ! empty( $result['skipped'] ) && ! empty( $result['status'] ) && null === $this->attachments->get_record( $attachment_id ) ) {
+			$this->store_upload_status( $attachment_id, self::AUTO_SKIP, (string) $result['status'] );
+			delete_post_meta( $attachment_id, self::AUTO_FAILURE );
 		}
+	}
+
+	/**
+	 * @param int    $attachment_id Attachment ID.
+	 * @param string $key           Metadata key.
+	 * @param string $reason        Outcome code.
+	 * @return void
+	 */
+	private function store_upload_status( int $attachment_id, string $key, string $reason ): void {
+		update_post_meta(
+			$attachment_id,
+			$key,
+			array(
+				'reason' => $reason,
+				'stamp'  => $this->attachments->attachment_source_stamp( $attachment_id ),
+			)
+		);
+	}
+
+	/**
+	 * @param int    $attachment_id Attachment ID.
+	 * @param string $key           Metadata key.
+	 * @return string Outcome for the current file only.
+	 */
+	private function get_upload_status( int $attachment_id, string $key ): string {
+		$stored = get_post_meta( $attachment_id, $key, true );
+		if ( is_string( $stored ) ) {
+			return $stored;
+		}
+		return is_array( $stored ) && ( $stored['stamp'] ?? '' ) === $this->attachments->attachment_source_stamp( $attachment_id )
+			? (string) ( $stored['reason'] ?? '' )
+			: '';
+	}
+
+	/**
+	 * Queue a previously checked attachment again if WordPress has replaced its source.
+	 *
+	 * @param int    $meta_id       Metadata row ID.
+	 * @param int    $attachment_id Post ID.
+	 * @param string $key           Metadata key.
+	 * @return void
+	 */
+	public function maybe_reset_image_check( int $meta_id, int $attachment_id, string $key ): void {
+		if ( ! in_array( $key, array( '_wp_attached_file', '_wp_attachment_metadata' ), true ) ) {
+			return;
+		}
+		$record = $this->attachments->get_record( $attachment_id );
+		if ( null === $record || ! $record->is_unchanged() || '' === $record->source_revision() ) {
+			return;
+		}
+		$image = $this->attachments->find_image( $attachment_id, true );
+		if ( $record->source_revision() === ( $image['source_revision'] ?? '' ) ) {
+			return;
+		}
+		$this->attachments->with_attachment_lock(
+			$attachment_id,
+			function () use ( $attachment_id, $record ): void {
+				$current = $this->attachments->get_record( $attachment_id );
+				if ( null !== $current && $record->to_array() === $current->to_array() ) {
+					$this->attachments->delete_record( $attachment_id );
+				}
+			}
+		);
 	}
 
 	/**
@@ -433,9 +504,12 @@ final class MediaHooks {
 	 * @return string
 	 */
 	private function upload_status( int $attachment_id ): string {
-		$reason = get_post_meta( $attachment_id, self::AUTO_FAILURE, true );
-		if ( ! is_string( $reason ) || '' === $reason ) {
-			return esc_html__( 'Not optimized', 'kilobyte-image-optimizer' );
+		$reason = $this->get_upload_status( $attachment_id, self::AUTO_FAILURE );
+		if ( '' === $reason ) {
+			$skip = $this->get_upload_status( $attachment_id, self::AUTO_SKIP );
+			return '' !== $skip
+				? esc_html( OperationErrorMessage::describe_skip( $skip ) )
+				: esc_html__( 'Not optimized', 'kilobyte-image-optimizer' );
 		}
 		$error = OperationErrorMessage::to_wp_error( new OperationFailure( $reason ) );
 		return sprintf(
@@ -485,10 +559,10 @@ final class MediaHooks {
 			return;
 		}
 
-		if ( $record->is_already_optimal() ) {
+		if ( $record->is_unchanged() ) {
 			printf(
 				'<span style="color:#2271b1;font-weight:500;">%s</span>',
-				esc_html__( 'Already optimal', 'kilobyte-image-optimizer' )
+				esc_html( OperationErrorMessage::describe_skip( $record->status() ) )
 			);
 			return;
 		}
@@ -525,8 +599,8 @@ final class MediaHooks {
 		$record = $this->attachments->get_record( $post->ID );
 		if ( null === $record ) {
 			$html = $this->upload_status( $post->ID );
-		} elseif ( $record->is_already_optimal() ) {
-			$html = esc_html__( 'Already optimal', 'kilobyte-image-optimizer' );
+		} elseif ( $record->is_unchanged() ) {
+			$html = esc_html( OperationErrorMessage::describe_skip( $record->status() ) );
 		} else {
 			$html = sprintf(
 				'<strong>-%s%%</strong> (%s) &middot; %s &rarr; %s',
@@ -564,14 +638,8 @@ final class MediaHooks {
 			return $attr;
 		}
 
-		if ( empty( $attr['decoding'] ) ) {
+		if ( ! array_key_exists( 'decoding', $attr ) ) {
 			$attr['decoding'] = 'async';
-		}
-
-		if ( ! $this->lcp_applied && is_singular() && in_the_loop() ) {
-			$attr['fetchpriority'] = 'high';
-			unset( $attr['loading'] );
-			$this->lcp_applied = true;
 		}
 
 		return $attr;

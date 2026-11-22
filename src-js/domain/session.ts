@@ -12,6 +12,7 @@ export interface RunSummary {
 	mode: QueueMode;
 	succeeded: number;
 	skipped: number;
+	skippedByReason: Record< string, number >;
 	failed: number;
 	stopped: boolean;
 }

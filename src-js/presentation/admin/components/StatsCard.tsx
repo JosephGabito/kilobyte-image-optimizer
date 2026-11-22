@@ -83,11 +83,6 @@ export function StatsCard( { stats, error, onRetry }: StatsCardProps ) {
 							<Heading level={ 2 } size={ 22 }>
 								{ stats.remaining_count.toLocaleString() }
 							</Heading>
-							<Text size={ 12 } variant="muted">
-								{ stats.remaining_count === 0
-									? __( 'All done', 'kilobyte-image-optimizer' )
-									: __( 'Remaining', 'kilobyte-image-optimizer' ) }
-							</Text>
 						</VStack>
 
 						<VStack spacing={ 1 }>

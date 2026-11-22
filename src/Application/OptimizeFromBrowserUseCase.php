@@ -66,7 +66,7 @@ final class OptimizeFromBrowserUseCase {
 	 * @param string $detected_mime Validated MIME type.
 	 * @param int    $candidate_size Size of the validated upload.
 	 * @param bool   $is_preview     Whether the user explicitly selected a preview format.
-	 * @param string $source_hash    Hash of the GIF the browser encoded.
+	 * @param string $source_hash    Hash of the source the browser encoded.
 	 * @return array<string, mixed>|OperationFailure
 	 */
 	public function execute( int $attachment_id, string $tmp_path, string $detected_mime, int $candidate_size, bool $is_preview = false, string $source_hash = '' ) {
@@ -84,9 +84,12 @@ final class OptimizeFromBrowserUseCase {
 				if ( null === $image || ! $this->policy->is_supported_source_mime( (string) $image['mime_type'] ) ) {
 					return new OperationFailure( OperationFailure::MISSING_SOURCE );
 				}
+				if ( '' === $source_hash || ! hash_equals( $image['source_hash'], $source_hash ) ) {
+					return new OperationFailure( OperationFailure::SOURCE_CHANGED );
+				}
 
 				$existing = $this->attachments->get_record( $attachment_id );
-				if ( null !== $existing && ! $existing->is_already_optimal() ) {
+				if ( null !== $existing && ! $existing->is_unchanged() ) {
 					return array(
 						'id'      => $attachment_id,
 						'skipped' => true,
@@ -103,9 +106,6 @@ final class OptimizeFromBrowserUseCase {
 				}
 
 				$settings = $this->settings->load();
-				if ( 'image/gif' !== $image['mime_type'] && '' !== $source_hash ) {
-					return new OperationFailure( OperationFailure::SOURCE_CHANGED );
-				}
 				if ( 'image/gif' === $image['mime_type'] ) {
 					if ( ! $is_preview && ImageFormat::ORIGINAL === $settings->format()->value() ) {
 						return array(
@@ -116,9 +116,6 @@ final class OptimizeFromBrowserUseCase {
 					}
 					if ( ! in_array( $detected_mime, array( 'image/webp', 'image/avif' ), true ) ) {
 						return new OperationFailure( OperationFailure::ENCODE_FAILED );
-					}
-					if ( '' === $source_hash || ! hash_equals( $image['source_hash'], $source_hash ) ) {
-						return new OperationFailure( OperationFailure::SOURCE_CHANGED );
 					}
 				}
 				if ( $this->policy->should_skip_output( (int) $image['file_size'], $candidate_size, $settings ) ) {

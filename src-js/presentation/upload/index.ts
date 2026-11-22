@@ -2,11 +2,12 @@ import apiFetch from '@wordpress/api-fetch';
 import { __, sprintf } from '@wordpress/i18n';
 import { toFriendlyError } from '../../domain/errors';
 import { isSupportedMime } from '../../domain/format';
-import type { UploadBootstrapConfig } from '../../domain/types';
+import type { OptimizeResponse, UploadBootstrapConfig } from '../../domain/types';
 import { browserCompressor } from '../../infrastructure/browserCompressor';
 import { wpRestClient } from '../../infrastructure/wpRestClient';
 import { restoreControls, updateRestoredAttachment } from '../../infrastructure/wpMedia';
 import { restoreDetails } from '../restoreDetails';
+import { optimizationSkip } from '../optimizationSkip';
 
 declare global {
 	interface Window {
@@ -23,6 +24,7 @@ function uploadStatus( optimizerUrl: string ) {
 	let content: HTMLDivElement | undefined;
 	let progress: HTMLParagraphElement | undefined;
 	let failedUploads: HTMLUListElement | undefined;
+	let skippedUploads: HTMLUListElement | undefined;
 	const warnBeforeLeaving = ( event: BeforeUnloadEvent ) => {
 		event.preventDefault();
 		event.returnValue = '';
@@ -42,7 +44,7 @@ function uploadStatus( optimizerUrl: string ) {
 	};
 
 	const removeEmptyNotice = () => {
-		if ( ! progress && ! failedUploads ) {
+		if ( ! progress && ! failedUploads && ! skippedUploads ) {
 			notice?.remove();
 			notice = undefined;
 			content = undefined;
@@ -104,6 +106,30 @@ function uploadStatus( optimizerUrl: string ) {
 			item.append( name, ' ', failure.friendly, ' ', failure.action, details );
 			failedUploads.append( item );
 		},
+		skip( filename: string, reason?: string ) {
+			if ( ! skippedUploads ) {
+				const result = document.createElement( 'div' );
+				result.setAttribute( 'role', 'status' );
+				skippedUploads = document.createElement( 'ul' );
+				const dismiss = document.createElement( 'button' );
+				dismiss.type = 'button';
+				dismiss.className = 'button-link';
+				dismiss.textContent = __( 'Dismiss skipped images', 'kilobyte-image-optimizer' );
+				dismiss.addEventListener( 'click', () => {
+					result.remove();
+					skippedUploads = undefined;
+					removeEmptyNotice();
+				} );
+				result.append( skippedUploads, dismiss );
+				getNoticeContent().append( result );
+			}
+			const explanation = optimizationSkip( reason );
+			const item = document.createElement( 'li' );
+			const name = document.createElement( 'strong' );
+			name.textContent = filename;
+			item.append( name, ' ', explanation.subtitle, explanation.action ? ` ${ explanation.action }` : '' );
+			skippedUploads.append( item );
+		},
 		finish() {
 			pending -= 1;
 			if ( ! pending ) {
@@ -151,21 +177,22 @@ function installUploadMiddleware( config: UploadBootstrapConfig ): void {
 			if ( ! config.settings.enabled ) {
 				return;
 			}
+			const report = ( result: OptimizeResponse ) => {
+				if ( result.skipped ) {
+					status.skip( file.name, result.status );
+				}
+			};
 			let result;
 			try {
 				// WordPress compares with the file it actually kept after upload processing.
 				result = await browserCompressor.compress( file, { ...config.settings, skip_smaller: false } );
 			} catch {
-				await wpRestClient.optimizeOnServer( id );
+				report( await wpRestClient.optimizeOnServer( id ) );
 				return;
 			}
-			if ( result.reason === 'animated' || result.reason === 'original_format_kept' ) {
-				return;
-			}
-
-			if ( result.file && result.filename && config.outputMimes.includes( result.file.type ) && ( file.type !== 'image/gif' || result.sourceHash ) ) {
+			if ( result.file && result.filename && config.outputMimes.includes( result.file.type ) && result.sourceHash ) {
 				try {
-					await wpRestClient.uploadOptimized( id, result.file, result.filename, { sourceHash: result.sourceHash } );
+					report( await wpRestClient.uploadOptimized( id, result.file, result.filename, { sourceHash: result.sourceHash } ) );
 					return;
 				} catch ( error ) {
 					const code = ( error as { code?: string } )?.code;
@@ -174,7 +201,7 @@ function installUploadMiddleware( config: UploadBootstrapConfig ): void {
 					}
 				}
 			}
-			await wpRestClient.optimizeOnServer( id );
+			report( await wpRestClient.optimizeOnServer( id ) );
 		} ).catch( ( error ) => status.fail( file.name, error ) ).finally( status.finish );
 
 		return response;

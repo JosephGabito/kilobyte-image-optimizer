@@ -9,6 +9,7 @@ import type { BulkProgress, LibraryStats, LogEntry, PluginSettings, QueueItem, Q
 import { browserCompressor } from '../../infrastructure/browserCompressor';
 import { wpRestClient } from '../../infrastructure/wpRestClient';
 import { updateRestoredAttachment } from '../../infrastructure/wpMedia';
+import { optimizationSkip } from '../optimizationSkip';
 import { restoreDetails } from '../restoreDetails';
 
 interface QueueOptions {
@@ -91,10 +92,19 @@ export function useOptimizationQueue( {
 		let succeeded = 0;
 		let skipped = 0;
 		let missing = 0;
+		const skippedByReason: Record< string, number > = Object.create( null );
 		const failed: QueueItem[] = [];
 		const pendingRetry = new Map( presetItems?.map( ( item ) => [ item.id, item ] ) );
 		let before: number | null = resumeBefore;
 		let pendingPage = presetItems;
+		const summarize = (): RunSummary => ( {
+			mode,
+			succeeded,
+			skipped: skipped + missing,
+			skippedByReason: { ...skippedByReason, ...( missing ? { unavailable: missing } : {} ) },
+			failed: failed.length,
+			stopped: stopRef.current,
+		} );
 
 		const report = ( stage: string, currentFile?: string, download?: BulkProgress[ 'download' ] ) => {
 			if ( stopRef.current ) {
@@ -124,6 +134,7 @@ export function useOptimizationQueue( {
 					scan.current = null;
 					before = page.next_before || null;
 					missing += page.skipped_missing ?? 0;
+					done += page.skipped_missing ?? 0;
 					items = page.items;
 					for ( const item of items ) {
 						pendingRetry.set( item.id, item );
@@ -185,11 +196,18 @@ export function useOptimizationQueue( {
 									( stage, filename, download ) => report( stages[ stage ], filename, download ),
 									outputMimes
 								);
-								pushLog( outcome );
-								if ( outcome.tone === 'muted' ) {
+								if ( 'skipReason' in outcome ) {
+									pushLog( {
+										title: outcome.title,
+										...optimizationSkip( outcome.skipReason ),
+										metric: __( 'Skipped', 'kilobyte-image-optimizer' ),
+										tone: 'muted',
+									} );
 									skipped += 1;
+									skippedByReason[ outcome.skipReason ] = ( skippedByReason[ outcome.skipReason ] ?? 0 ) + 1;
 									return;
 								}
+								pushLog( outcome );
 							}
 							succeeded += 1;
 						} finally {
@@ -206,16 +224,13 @@ export function useOptimizationQueue( {
 			}
 
 			if ( ! done && ! stopRef.current ) {
-				onEmpty( missing
-					? __( 'No available files to process. Some images are missing or stored elsewhere.', 'kilobyte-image-optimizer' )
-					: __( 'There are no images left for this action.', 'kilobyte-image-optimizer' )
-				);
+				onEmpty( __( 'There are no images left for this action.', 'kilobyte-image-optimizer' ) );
 			} else {
-				setLastSummary( { mode, succeeded, skipped, failed: failed.length, stopped: stopRef.current } );
+				setLastSummary( summarize() );
 			}
 			setPhase( stopRef.current ? 'stopped' : failed.length ? 'completed_with_errors' : 'completed' );
 		} catch ( err ) {
-			setLastSummary( { mode, succeeded, skipped, failed: failed.length, stopped: stopRef.current } );
+			setLastSummary( summarize() );
 			if ( stopRef.current ) {
 				setPhase( 'stopped' );
 			} else {
@@ -223,6 +238,16 @@ export function useOptimizationQueue( {
 				onError( err );
 			}
 		} finally {
+			if ( missing > 0 ) {
+				pushLog( {
+					/* translators: %d: image count. */
+					title: sprintf( __( 'Unavailable files (%d)', 'kilobyte-image-optimizer' ), missing ),
+					...optimizationSkip( 'unavailable' ),
+					count: missing,
+					metric: __( 'Skipped', 'kilobyte-image-optimizer' ),
+					tone: 'muted',
+				} );
+			}
 			scan.current = null;
 			setRetryItems( [ ...failed, ...pendingRetry.values() ] );
 			setNextPage( before );

@@ -1,7 +1,7 @@
 import { clampQuality } from '../domain/dimensions';
 import { isSupportedMime, resolveTargetMime, swapExtension } from '../domain/format';
 import type { BrowserSupport, CompressionResult, PluginSettings } from '../domain/types';
-import { encodeRaster, isAnimated, MAX_IMAGE_BYTES, type EncodeRequest } from './rasterEncoder';
+import { assertBoundedRaster, encodeRaster, isAnimated, MAX_IMAGE_BYTES, type EncodeRequest } from './rasterEncoder';
 
 let workerUrl = '';
 let browserSupport: Promise< BrowserSupport > | undefined;
@@ -91,6 +91,7 @@ async function compress(
 	if ( ! originalSize || originalSize > MAX_IMAGE_BYTES ) {
 		throw new Error( 'image_too_large' );
 	}
+	await assertBoundedRaster( file );
 	if ( await isAnimated( file ) ) {
 		return skipped( 'animated' );
 	}
@@ -140,20 +141,20 @@ async function compress(
 		encoded = await onMainThread();
 	}
 
-	if ( settings.skip_smaller && encoded.blob.size >= originalSize ) {
-		return skipped( 'not_smaller' );
-	}
-
-	const filename = swapExtension( file.name, target.ext );
 	let sourceHash: string | undefined;
-	if ( file.type === 'image/gif' && globalThis.crypto?.subtle ) {
+	if ( globalThis.crypto?.subtle ) {
 		try {
 			const digest = await globalThis.crypto.subtle.digest( 'SHA-256', await file.arrayBuffer() );
 			sourceHash = Array.from( new Uint8Array( digest ), ( byte ) => byte.toString( 16 ).padStart( 2, '0' ) ).join( '' );
 		} catch {
-			// Upload callers can use the server when the browser cannot verify the GIF.
+			// Callers can use the server when the browser cannot verify the source.
 		}
 	}
+	if ( settings.skip_smaller && encoded.blob.size >= originalSize ) {
+		return { ...skipped( 'not_smaller' ), sourceHash };
+	}
+
+	const filename = swapExtension( file.name, target.ext );
 	return {
 		skipped: false,
 		file: new File( [ encoded.blob ], filename, { type: target.mime } ),
