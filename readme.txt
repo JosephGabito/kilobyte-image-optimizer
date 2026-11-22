@@ -84,6 +84,8 @@ New pages load the files in your Media Library. Uninstall removes your Kilobyte 
 
 == Development ==
 
+Source code and issue tracking are hosted on [GitHub](https://github.com/JosephGabito/kilobyte-image-optimizer).
+
 The editable JavaScript and TypeScript are in `src-js/`. With Node.js 24.15 or later in the Node.js 24 series, run `npm ci` and `npm run build` from the plugin directory. The build writes the browser scripts and dependency manifests to `build/`.
 
 == Changelog ==

@@ -2,28 +2,30 @@
 
 # Kilobyte Image Optimizer
 
-Unlimited free WordPress image optimization. Compress photos to **WebP** or **AVIF** in your browser (with automatic server fallback), keep existing media URLs intact, preview before/after quality before touching your library, and regenerate thumbnails with zero accounts, zero API keys, and zero credit limits.
+Unlimited free image optimization for WordPress — compress, resize, and convert photos to **WebP** and **AVIF** in your browser or on your WordPress site, with no account, no API key, and no monthly credit limits.
 
-## Why Kilobyte?
+## Design Philosophy
 
-- **No accounts, no API keys, no credit paywalls.** Processing runs locally in your browser or on your own WordPress site.
-- **Preview before you optimize.** Compare before/after quality and file size on any image from your Media Library or computer without modifying anything on your site.
-- **Existing links stay safe.** Bulk optimization keeps the original Media Library file and saves a smaller WebP or AVIF copy beside it, serving modern formats with `<picture>` fallback to the original.
-- **One-click restore.** Restore a single image from the Media Library or restore your entire library from **Media → Optimization**.
-- **Native WordPress experience.** Built with `@wordpress/components` and zero third-party UI bloat.
+We care about your experience because we are WordPress users too. Kilobyte is designed to feel like a natural part of WordPress:
 
-## Features
+- **Ready right after activation:** Works without an account, API key, or monthly quota. Processing runs in your browser or with your WordPress site's built-in image editor.
+- **Calm admin experience:** Keeps your dashboard focused on your media, with clean controls and no promotional banners or locked settings.
+- **Native WordPress interface:** Built with `@wordpress/components` organized into four simple tabs (**Preview**, **Selective optimize**, **Bulk optimize**, **Preference**).
+- **Safe by default:** Leaves your original Media Library files and existing image URLs untouched, so you can test freely and restore anytime.
 
-- **Browser-first compression** using a dedicated Web Worker (`OffscreenCanvas` / Canvas), plus automatic server-side fallback via WordPress's `WP_Image_Editor` (Imagick / GD) for Safari, mobile apps, REST uploads, and unsupported formats.
-- **WebP, AVIF, and Keep original** output modes with three presets (*High detail*, *Balanced*, *Smallest files*) and optional max-width resizing.
-- **Bulk optimization** with resumable pagination, live ETA, per-item status filtering, and non-destructive sibling delivery.
-- **Thumbnail regeneration**, optional alt text from filenames, and optional image decoding hints.
-- **WP-CLI support**:
-  - `wp kilobyte optimize`
-  - `wp kilobyte restore`
-  - `wp kilobyte stats`
-  - `wp kilobyte purge-backups`
-- **Cache-friendly invalidation**: fires `do_action( 'kilobyte_io_variant_changed', $attachment_id )` whenever a variant is created or restored, and keeps restored copies available for at least 24 hours. Clear affected pages if your cache can keep them longer.
+## Key Features
+
+- **Automatic image compression on upload:** Creates smaller copies of supported images right after WordPress saves the original — using your browser for Gutenberg and Media Library uploads, or WordPress scheduled tasks for classic, mobile app, and server-handled REST uploads.
+- **Live quality preview & single optimize:** Compare compression side by side on any photo from your Media Library or computer, switch formats and presets live, and save a single image with **Optimize now** (or **Download copy** for local files).
+- **Selective optimize:** Multi-select specific Media Library photos (paginated for large selections) to optimize a single post, landing page, or gallery without running a full bulk job.
+- **Bulk image optimizer:** Optimize your entire Media Library with resumable pagination, live ETA, reload protection, and one-click retry for failed items.
+- **WebP & AVIF converter + static GIF support:** Converts JPEG, PNG, BMP, and static GIF images to WebP or AVIF while automatically detecting and leaving animated GIFs, APNGs, and animated WebPs untouched.
+- **Non-destructive originals & 1-click restore:** Keeps original Media Library files in place, serves smaller copies via `<picture>` with automatic fallback, and lets you restore a single image or **Restore all**.
+- **Resize optimized copies, regenerate thumbnails & optional hints:** Scale down oversized copies, rebuild registered WordPress thumbnail sizes safely, fill empty alt text from filenames, and add image decoding hints.
+- **WP-CLI & developer hooks:**
+  - `wp kilobyte optimize`, `wp kilobyte restore`, `wp kilobyte stats`, `wp kilobyte purge-backups`
+  - `kilobyte_io_variant_filename` — filter generated variant filenames
+  - `kilobyte_io_variant_changed` — action fired on create/restore for page-cache invalidation
 
 ## Requirements
 
@@ -35,11 +37,11 @@ Unlimited free WordPress image optimization. Compress photos to **WebP** or **AV
 
 1. Upload the `kilobyte-image-optimizer` folder to `/wp-content/plugins/` (or install the release ZIP via **Plugins → Add New → Upload Plugin**).
 2. Activate **Kilobyte Image Optimizer**.
-3. Open **Media → Optimization**, preview an image, and run **Optimize remaining images**.
+3. Open **Media → Optimization**, test any photo in **Preview**, optimize chosen files in **Selective optimize**, or run **Bulk optimize**.
 
-## Development
+## Development & Contributing
 
-The plugin uses Domain-Driven Design (DDD) across both PHP (`src/`) and TypeScript (`src-js/`), with zero runtime Composer dependencies.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for architecture notes, coding standards, local setup, and pull request guidelines.
 
 ```bash
 # Install dev dependencies
@@ -49,25 +51,16 @@ npm ci
 # Watch and rebuild frontend assets
 npm run start
 
-# Production build
-npm run build
-```
-
-### Quality & Release Pipeline
-
-```bash
 # Auto-fix PHP formatting (WordPress-VIP-Go + WordPress-Extra)
 npm run lint:php:fix
 
-# Run PHPCS (uncached), TypeScript check, production build, and headless WordPress Plugin Check
+# Run PHPCS (uncached), TypeScript check, production build, and headless Plugin Check
 npm run verify
 
 # Build a clean WordPress.org release ZIP in dist/
 npm run package
 ```
 
-Release checks use a disposable WordPress installation with WordPress Plugin Check installed. Run them from a checkout inside that installation or set `WP_ROOT` to its root. An active Kilobyte installation limits the local check to static checks. CI runs static and runtime checks against the staged plugin. `npm ci` and `npm run build` only need the plugin source and Node.js.
-
 ## License
 
-Licensed under the [GNU General Public License v2.0 or later](LICENSE) (`GPL-2.0-or-later`), matching WordPress core and WordPress.org plugin directory requirements.
+Licensed under the [GNU General Public License v2.0 or later](LICENSE) (`GPL-2.0-or-later`).
