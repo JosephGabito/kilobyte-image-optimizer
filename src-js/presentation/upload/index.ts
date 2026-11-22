@@ -1,0 +1,229 @@
+import apiFetch from '@wordpress/api-fetch';
+import { __, sprintf } from '@wordpress/i18n';
+import { toFriendlyError } from '../../domain/errors';
+import { isSupportedMime } from '../../domain/format';
+import type { UploadBootstrapConfig } from '../../domain/types';
+import { browserCompressor } from '../../infrastructure/browserCompressor';
+import { wpRestClient } from '../../infrastructure/wpRestClient';
+import { restoreDetails } from '../restoreDetails';
+
+declare global {
+	interface Window {
+		KilobyteIOUploadConfig?: UploadBootstrapConfig;
+	}
+}
+
+
+function uploadStatus( optimizerUrl: string ) {
+	let pending = 0;
+	let started = 0;
+	let timer: number | undefined;
+	let notice: HTMLDivElement | undefined;
+	let content: HTMLDivElement | undefined;
+	let progress: HTMLParagraphElement | undefined;
+	let failedUploads: HTMLUListElement | undefined;
+	const warnBeforeLeaving = ( event: BeforeUnloadEvent ) => {
+		event.preventDefault();
+		event.returnValue = '';
+	};
+
+	const getNoticeContent = () => {
+		if ( ! content ) {
+			notice = document.createElement( 'div' );
+			content = document.createElement( 'div' );
+			const editorNotices = document.querySelector( '.interface-interface-skeleton__notices, .editor-notices' );
+			notice.className = editorNotices ? 'components-notice is-info' : 'notice notice-info inline';
+			content.className = editorNotices ? 'components-notice__content' : '';
+			notice.append( content );
+			( editorNotices ?? document.querySelector( '#wpbody-content .wrap' ) ?? document.body ).prepend( notice );
+		}
+		return content;
+	};
+
+	const removeEmptyNotice = () => {
+		if ( ! progress && ! failedUploads ) {
+			notice?.remove();
+			notice = undefined;
+			content = undefined;
+		}
+	};
+
+	const renderProgress = () => {
+		if ( ! progress ) {
+			progress = document.createElement( 'p' );
+			getNoticeContent().prepend( progress );
+		}
+		progress.textContent = sprintf(
+			/* translators: %d: elapsed seconds. */
+			__( 'Making smaller copies. Keep this tab open. %ds elapsed.', 'kilobyte-image-optimizer' ),
+			Math.floor( ( Date.now() - started ) / 1000 )
+		);
+	};
+
+	return {
+		start() {
+			if ( ! pending ) {
+				started = Date.now();
+				window.addEventListener( 'beforeunload', warnBeforeLeaving );
+				timer = window.setInterval( renderProgress, 1000 );
+			}
+			pending += 1;
+			renderProgress();
+		},
+		fail( filename: string, error: unknown ) {
+			const failure = toFriendlyError( error );
+			if ( ! failedUploads ) {
+				const warning = document.createElement( 'div' );
+				warning.setAttribute( 'role', 'status' );
+				const message = document.createElement( 'p' );
+				message.textContent = __( 'Your original uploads are saved. Some smaller copies still need a retry.', 'kilobyte-image-optimizer' );
+				const link = document.createElement( 'a' );
+				link.href = optimizerUrl;
+				link.textContent = __( 'Retry in Media → Optimization', 'kilobyte-image-optimizer' );
+				const dismiss = document.createElement( 'button' );
+				dismiss.type = 'button';
+				dismiss.className = 'button-link';
+				dismiss.textContent = __( 'Dismiss', 'kilobyte-image-optimizer' );
+				dismiss.addEventListener( 'click', () => {
+					warning.remove();
+					failedUploads = undefined;
+					removeEmptyNotice();
+				} );
+				failedUploads = document.createElement( 'ul' );
+				warning.append( message, failedUploads, link, ' · ', dismiss );
+				getNoticeContent().append( warning );
+			}
+			const item = document.createElement( 'li' );
+			const name = document.createElement( 'strong' );
+			name.textContent = filename;
+			const details = document.createElement( 'details' );
+			const summary = document.createElement( 'summary' );
+			summary.textContent = __( 'Technical details', 'kilobyte-image-optimizer' );
+			details.append( summary, failure.technical );
+			item.append( name, ' ', failure.friendly, ' ', failure.action, details );
+			failedUploads.append( item );
+		},
+		finish() {
+			pending -= 1;
+			if ( ! pending ) {
+				window.removeEventListener( 'beforeunload', warnBeforeLeaving );
+				window.clearInterval( timer );
+				progress?.remove();
+				progress = undefined;
+				removeEmptyNotice();
+			}
+		},
+	};
+}
+
+function installUploadMiddleware( config: UploadBootstrapConfig ): void {
+	const mediaUrl = new URL( config.mediaUrl, window.location.href );
+	let processing = Promise.resolve();
+	const status = uploadStatus( config.optimizerUrl );
+
+	apiFetch.use( async ( options, next ) => {
+		const isMediaPath = options.path?.split( '?' )[ 0 ].replace( /\/$/, '' ) === '/wp/v2/media';
+		const body = options.body;
+		if ( ! isMediaPath || options.method?.toUpperCase() !== 'POST' || ! ( body instanceof FormData ) || options.parse === false ) {
+			return next( options );
+		}
+		if ( mediaUrl.origin !== window.location.origin || body.get( 'generate_sub_sizes' ) === 'false' ) {
+			return next( options );
+		}
+		const file = body.get( 'file' );
+		if ( ! ( file instanceof File ) || ! isSupportedMime( file.type ) || ! browserCompressor.canUseWorker() ) {
+			return next( options );
+		}
+
+		// WordPress must receive the original. Process a copy after it returns an attachment ID.
+		const headers: Record< string, string > = {};
+		new Headers( options.headers ).forEach( ( value, name ) => { headers[ name ] = value; } );
+		headers[ 'X-Kilobyte-Browser-Optimize' ] = '1';
+		const response = await next( { ...options, headers } );
+		const id = ( response as { id?: number } | null )?.id;
+		if ( ! Number.isSafeInteger( id ) || id <= 0 ) {
+			return response;
+		}
+
+		status.start();
+		processing = processing.then( async () => {
+			let result;
+			try {
+				// WordPress compares with the file it actually kept after upload processing.
+				result = await browserCompressor.compress( file, { ...config.settings, skip_smaller: false } );
+			} catch {
+				await wpRestClient.optimizeOnServer( id );
+				return;
+			}
+			if ( result.reason === 'animated' ) {
+				return;
+			}
+
+			if ( result.file && result.filename && config.outputMimes.includes( result.file.type ) ) {
+				try {
+					await wpRestClient.uploadOptimized( id, result.file, result.filename );
+					return;
+				} catch ( error ) {
+					const code = ( error as { code?: string } )?.code;
+					if ( code !== 'kilobyte_io_invalid_mime' && code !== 'kilobyte_io_invalid_image' ) {
+						throw error;
+					}
+				}
+			}
+			await wpRestClient.optimizeOnServer( id );
+		} ).catch( ( error ) => status.fail( file.name, error ) ).finally( status.finish );
+
+		return response;
+	} );
+}
+
+function installRestoreButtonHandler(): void {
+	document.addEventListener( 'click', async ( event ) => {
+		const target = event.target;
+		if ( ! ( target instanceof Element ) ) {
+			return;
+		}
+		const button = target.closest< HTMLButtonElement >( '.kilobyte-restore-btn' );
+		const id = Number( button?.dataset.id );
+		if ( ! button || button.disabled || ! Number.isSafeInteger( id ) || id <= 0 ) {
+			return;
+		}
+
+		button.nextElementSibling?.matches( '.kilobyte-restore-error' ) && button.nextElementSibling.remove();
+		button.disabled = true;
+		button.textContent = __( 'Restoring...', 'kilobyte-image-optimizer' );
+
+		try {
+			const result = await wpRestClient.restoreAttachment( id );
+			const details = restoreDetails( result );
+			const message = details
+				? `${ __( 'Original restored.', 'kilobyte-image-optimizer' ) } ${ details }`
+				: __( 'Restored', 'kilobyte-image-optimizer' );
+			button.closest( 'td' )?.replaceChildren( message );
+			button.textContent = message;
+		} catch ( error ) {
+			const message = toFriendlyError( error );
+			const feedback = document.createElement( 'div' );
+			feedback.className = 'kilobyte-restore-error';
+			feedback.setAttribute( 'role', 'status' );
+			feedback.textContent = `${ message.friendly } ${ message.action }`;
+			const details = document.createElement( 'details' );
+			const summary = document.createElement( 'summary' );
+			summary.textContent = __( 'Technical details', 'kilobyte-image-optimizer' );
+			details.append( summary, message.technical );
+			feedback.append( details );
+			button.after( feedback );
+			button.disabled = false;
+			button.textContent = __( 'Restore original', 'kilobyte-image-optimizer' );
+		}
+	} );
+}
+
+const config = window.KilobyteIOUploadConfig;
+if ( config ) {
+	browserCompressor.setWorkerUrl( config.workerUrl );
+	if ( config.settings.enabled ) {
+		installUploadMiddleware( config );
+	}
+	installRestoreButtonHandler();
+}

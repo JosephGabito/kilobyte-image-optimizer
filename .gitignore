@@ -1,0 +1,9 @@
+node_modules/
+vendor/
+dist/
+.DS_Store
+._*
+.phpactor.json
+banner.png
+*.zip
+.phpunit.result.cache

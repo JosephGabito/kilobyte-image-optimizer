@@ -1,0 +1,42 @@
+<?xml version="1.0"?>
+<ruleset name="Kilobyte Image Optimizer VIP">
+	<description>WordPress VIP Go coding standards for Kilobyte Image Optimizer.</description>
+
+	<file>kilobyte-image-optimizer.php</file>
+	<file>uninstall.php</file>
+	<file>src</file>
+
+	<arg value="sp"/>
+	<arg name="basepath" value="."/>
+	<arg name="colors"/>
+	<arg name="extensions" value="php"/>
+	<arg name="parallel" value="8"/>
+
+	<config name="minimum_wp_version" value="6.6"/>
+	<config name="testVersion" value="7.4-"/>
+
+	<rule ref="WordPress-VIP-Go"/>
+	<rule ref="WordPress-Extra">
+		<!-- Allow PSR-4 class filenames inside src/ -->
+		<exclude name="WordPress.Files.FileName.InvalidClassFileName"/>
+		<exclude name="WordPress.Files.FileName.NotHyphenatedLowercase"/>
+	</rule>
+
+	<rule ref="WordPress.WP.I18n">
+		<properties>
+			<property name="text_domain" type="array">
+				<element value="kilobyte-image-optimizer"/>
+			</property>
+		</properties>
+	</rule>
+
+	<rule ref="WordPress.NamingConventions.PrefixAllGlobals">
+		<properties>
+			<property name="prefixes" type="array">
+				<element value="kilobyte_io"/>
+				<element value="KILOBYTE_IO"/>
+				<element value="Kilobyte"/>
+			</property>
+		</properties>
+	</rule>
+</ruleset>

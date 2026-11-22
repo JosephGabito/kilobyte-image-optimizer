@@ -1,0 +1,54 @@
+name: CI & Plugin Check
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  lint-and-build:
+    name: PHPCS, TypeScript & Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          tools: composer:v2
+
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --prefer-dist
+
+      - name: Run PHPCS (VIP Go + WP Extra)
+        run: composer run lint -- --no-cache
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: TypeScript typecheck
+        run: npm run typecheck
+
+      - name: Build production assets
+        run: npm run build
+
+      - name: Stage release directory
+        run: |
+          mkdir -p /tmp/release/kilobyte-image-optimizer
+          rsync -a --exclude-from=.distignore ./ /tmp/release/kilobyte-image-optimizer/
+
+      - name: Run WordPress Plugin Check
+        uses: WordPress/plugin-check-action@v1
+        with:
+          plugin-path: /tmp/release/kilobyte-image-optimizer
+          categories: plugin_repo,security,performance
+          exclude-directories: .git,node_modules,vendor

@@ -1,0 +1,24 @@
+/**
+ * Minimal layout fine-tuning loaded exclusively on Media -> Kilobyte.
+ */
+body.media_page_kilobyte-image-optimizer #wpcontent {
+	padding-left: 0;
+}
+
+body.media_page_kilobyte-image-optimizer #wpbody-content {
+	padding-bottom: 0;
+}
+
+body.media_page_kilobyte-image-optimizer #kilobyte-io-root {
+	min-height: calc(100vh - 32px);
+	background: #fff;
+}
+
+body.media_page_kilobyte-image-optimizer #kilobyte-io-root hr[role="separator"] {
+	border-color: var(--wp-components-color-gray-200, #e0e0e0);
+}
+
+body.media_page_kilobyte-image-optimizer #kilobyte-io-root .components-panel__body {
+	border-top: 0;
+	border-bottom: 0;
+}
