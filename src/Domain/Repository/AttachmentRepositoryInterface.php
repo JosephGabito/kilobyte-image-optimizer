@@ -134,7 +134,7 @@ interface AttachmentRepositoryInterface {
 	public function regenerate_thumbnails( int $attachment_id ): ?int;
 
 	/**
-	 * Return paginated queue items for 'optimize', 'regenerate', or 'restore'.
+	 * Return paginated queue items and unavailable attachments for this page.
 	 *
 	 * @param string $mode     Queue mode.
 	 * @param int    $before   Return IDs below this cursor, or start at the latest image.

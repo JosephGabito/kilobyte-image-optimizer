@@ -918,14 +918,14 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 	 * @return array<string, mixed>
 	 */
 	public function get_queue_page( string $mode, int $before, int $per_page, bool $check_permissions = true ): array {
-		$per_page = max( 1, min( 100, $per_page ) );
-		$posts    = $this->query_images( $before, $per_page + 1 );
-		$has_more = count( $posts ) > $per_page;
-		$posts    = array_slice( $posts, 0, $per_page );
-		$items    = array();
-		$missing  = 0;
-		$cursor   = 0;
-		$keep_gif = 'optimize' === $mode && $this->keeps_gif_format();
+		$per_page    = max( 1, min( 100, $per_page ) );
+		$posts       = $this->query_images( $before, $per_page + 1 );
+		$has_more    = count( $posts ) > $per_page;
+		$posts       = array_slice( $posts, 0, $per_page );
+		$items       = array();
+		$unavailable = array();
+		$cursor      = 0;
+		$keep_gif    = 'optimize' === $mode && $this->keeps_gif_format();
 
 		foreach ( $posts as $post ) {
 			$attachment_id = (int) $post->ID;
@@ -946,7 +946,17 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 
 			$image = $this->find_image( $attachment_id );
 			if ( null === $image && 'restore' !== $mode ) {
-				++$missing;
+				$file = (string) get_attached_file( $attachment_id, true );
+				if ( '' === $file ) {
+					$metadata = wp_get_attachment_metadata( $attachment_id, true );
+					$file     = (string) ( $metadata['file'] ?? '' );
+				}
+				$unavailable[] = array(
+					'id'       => $attachment_id,
+					'filename' => wp_basename( (string) wp_parse_url( wp_normalize_path( $file ), PHP_URL_PATH ) ),
+					'title'    => trim( wp_strip_all_tags( $post->post_title ) ),
+					'edit_url' => esc_url_raw( (string) get_edit_post_link( $attachment_id, 'raw' ), array( 'http', 'https' ) ),
+				);
 				continue;
 			}
 
@@ -965,9 +975,10 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 		}
 
 		return array(
-			'items'           => $items,
-			'skipped_missing' => $missing,
-			'next_before'     => $has_more ? $cursor : 0,
+			'items'             => $items,
+			'unavailable_items' => $unavailable,
+			'skipped_missing'   => count( $unavailable ),
+			'next_before'       => $has_more ? $cursor : 0,
 		);
 	}
 

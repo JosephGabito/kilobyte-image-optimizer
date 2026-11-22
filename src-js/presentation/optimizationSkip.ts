@@ -1,6 +1,6 @@
-import { __ } from '@wordpress/i18n';
+import { __, _n } from '@wordpress/i18n';
 
-export function optimizationSkip( status?: string ): { subtitle: string; action?: string } {
+export function optimizationSkip( status?: string, count = 1 ): { subtitle: string; action?: string } {
 	switch ( status ) {
 		case 'already_optimal':
 			return {
@@ -32,8 +32,8 @@ export function optimizationSkip( status?: string ): { subtitle: string; action?
 			};
 		case 'unavailable':
 			return {
-				subtitle: __( 'WordPress could not open these files.', 'kilobyte-image-optimizer' ),
-				action: __( 'Check your media storage or recover the files, then try again.', 'kilobyte-image-optimizer' ),
+				subtitle: _n( 'WordPress could not open this file.', 'WordPress could not open these files.', count, 'kilobyte-image-optimizer' ),
+				action: _n( 'Check your media storage or recover the file, then try again.', 'Check your media storage or recover the files, then try again.', count, 'kilobyte-image-optimizer' ),
 			};
 		default:
 			return { subtitle: __( 'WordPress kept the original and did not return a reason.', 'kilobyte-image-optimizer' ) };

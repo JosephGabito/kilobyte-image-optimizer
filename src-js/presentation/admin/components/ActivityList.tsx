@@ -61,7 +61,7 @@ export function ActivityList( { items, skippedByReason }: ActivityListProps ) {
 								/* translators: 1: Number of images. 2: Reason images were skipped. */
 								__( '%1$d · %2$s', 'kilobyte-image-optimizer' ),
 								total,
-								optimizationSkip( reason ).subtitle
+								optimizationSkip( reason, total ).subtitle
 							) }
 						</Text>
 					) ) }
@@ -158,17 +158,34 @@ export function ActivityList( { items, skippedByReason }: ActivityListProps ) {
 									<HStack spacing={ 2 } alignment="top" style={ { minWidth: 0, flex: 1 } }>
 										<Icon icon={ icon } size={ 18 } style={ { flexShrink: 0, marginTop: 1 } } />
 										<VStack spacing={ 0 } style={ { minWidth: 0, flex: 1 } }>
-											<Truncate
-												limit={ 48 }
-												ellipsizeMode="middle"
-												style={ {
-													fontSize: 13,
-													fontWeight: 500,
-													color: row.tone === 'error' ? '#cc1818' : undefined,
-												} }
-											>
-												{ row.title }
-											</Truncate>
+											{ row.editUrl ? (
+												<Text
+													as="a"
+													href={ row.editUrl }
+													aria-label={ sprintf(
+														/* translators: %s: Filename or Media Library item name. */
+														__( 'Edit %s in the Media Library', 'kilobyte-image-optimizer' ),
+														row.title
+													) }
+													size={ 13 }
+													weight={ 500 }
+													style={ { overflowWrap: 'anywhere' } }
+												>
+													{ row.title }
+												</Text>
+											) : (
+												<Truncate
+													limit={ 48 }
+													ellipsizeMode="middle"
+													style={ {
+														fontSize: 13,
+														fontWeight: 500,
+														color: row.tone === 'error' ? '#cc1818' : undefined,
+													} }
+												>
+													{ row.title }
+												</Truncate>
+											) }
 											{ row.subtitle && (
 												<Text size={ 12 } variant="muted">
 													{ row.subtitle }

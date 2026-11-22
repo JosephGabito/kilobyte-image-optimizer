@@ -5,7 +5,7 @@ import { runBulkQueue } from '../../application/runBulkQueue';
 import { toFriendlyError } from '../../domain/errors';
 import { formatEta } from '../../domain/eta';
 import type { BulkPhase, RunSummary } from '../../domain/session';
-import type { BulkProgress, LibraryStats, LogEntry, PluginSettings, QueueItem, QueueMode } from '../../domain/types';
+import type { BulkProgress, LibraryStats, LogEntry, PluginSettings, QueueItem, QueueMode, UnavailableQueueItem } from '../../domain/types';
 import { browserCompressor } from '../../infrastructure/browserCompressor';
 import { wpRestClient } from '../../infrastructure/wpRestClient';
 import { updateRestoredAttachment } from '../../infrastructure/wpMedia';
@@ -92,6 +92,7 @@ export function useOptimizationQueue( {
 		let succeeded = 0;
 		let skipped = 0;
 		let missing = 0;
+		const unavailable: UnavailableQueueItem[] = [];
 		const skippedByReason: Record< string, number > = Object.create( null );
 		const failed: QueueItem[] = [];
 		const pendingRetry = new Map( presetItems?.map( ( item ) => [ item.id, item ] ) );
@@ -133,8 +134,11 @@ export function useOptimizationQueue( {
 					const page = await wpRestClient.getQueuePage( mode, before ?? 0, scan.current.signal );
 					scan.current = null;
 					before = page.next_before || null;
-					missing += page.skipped_missing ?? 0;
-					done += page.skipped_missing ?? 0;
+					const unavailableOnPage = page.unavailable_items ?? [];
+					const missingOnPage = Math.max( page.skipped_missing ?? 0, unavailableOnPage.length );
+					unavailable.push( ...unavailableOnPage );
+					missing += missingOnPage;
+					done += missingOnPage;
 					items = page.items;
 					for ( const item of items ) {
 						pendingRetry.set( item.id, item );
@@ -239,14 +243,33 @@ export function useOptimizationQueue( {
 			}
 		} finally {
 			if ( missing > 0 ) {
-				pushLog( {
-					/* translators: %d: image count. */
-					title: sprintf( __( 'Unavailable files (%d)', 'kilobyte-image-optimizer' ), missing ),
+				const metric = __( 'Skipped', 'kilobyte-image-optimizer' );
+				const missingLogs: LogEntry[] = unavailable.map( ( item ) => ( {
+					id: `unavailable-${ item.id }`,
+					title: item.filename || item.title || sprintf(
+						/* translators: %d: Media Library attachment ID. */
+						__( 'Media item #%d', 'kilobyte-image-optimizer' ),
+						item.id
+					),
+					editUrl: item.edit_url,
 					...optimizationSkip( 'unavailable' ),
-					count: missing,
-					metric: __( 'Skipped', 'kilobyte-image-optimizer' ),
+					metric,
 					tone: 'muted',
-				} );
+				} ) );
+				const unlisted = missing - unavailable.length;
+				if ( unlisted > 0 ) {
+					missingLogs.push( {
+						id: 'unavailable-items-without-details',
+						/* translators: %d: Image count. */
+						title: sprintf( __( 'Unavailable files (%d)', 'kilobyte-image-optimizer' ), unlisted ),
+						...optimizationSkip( 'unavailable', unlisted ),
+						count: unlisted,
+						metric,
+						tone: 'muted',
+					} );
+				}
+				// Keep these names available after the rolling activity list fills.
+				setLogs( ( recent ) => [ ...missingLogs, ...recent ] );
 			}
 			scan.current = null;
 			setRetryItems( [ ...failed, ...pendingRetry.values() ] );

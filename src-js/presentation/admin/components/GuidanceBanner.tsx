@@ -30,7 +30,7 @@ export function GuidanceBanner( { stats, autoEnabled }: GuidanceBannerProps ) {
 				{ sprintf(
 					/* translators: %s: count of unoptimized images */
 					__(
-						'You have %s images ready to optimize. Check the quality preview above first. When it looks right, optimize the rest in one click. Your original photos and links stay safe.',
+						'You have %s images ready to optimize. Try one in the Preview tab first to check the quality.',
 						'kilobyte-image-optimizer'
 					),
 					stats.remaining_count.toLocaleString()

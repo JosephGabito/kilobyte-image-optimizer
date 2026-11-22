@@ -40,8 +40,13 @@ export interface QueueItem {
 	height: number;
 }
 
+export interface UnavailableQueueItem extends Pick< QueueItem, 'id' | 'title' | 'filename' > {
+	edit_url: string;
+}
+
 export interface QueuePage {
 	items: QueueItem[];
+	unavailable_items?: UnavailableQueueItem[];
 	skipped_missing?: number;
 	next_before: number;
 }
@@ -90,6 +95,7 @@ export interface OptimizeResponse {
 export interface LogEntry {
 	id: string;
 	title: string;
+	editUrl?: string;
 	subtitle?: string;
 	metric?: string;
 	tone: 'success' | 'error' | 'muted' | 'info';

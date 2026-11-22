@@ -79,6 +79,9 @@ export function BulkOptimizerCard( {
 	const [ copyError, setCopyError ] = useState< FriendlyError | null >( null );
 	const running = activeMode !== null;
 	const isRetryState = ( phase === 'completed_with_errors' || phase === 'stopped' ) && ( failedCount > 0 || hasMore );
+	const backupReminderId = ! disabled && ! running && ! isRetryState && stats?.total_images !== 0
+		? 'kilobyte-io-bulk-backup-reminder'
+		: undefined;
 	const primaryLabel = isRetryState && ( phase === 'stopped' || hasMore )
 		? __( 'Continue processing images', 'kilobyte-image-optimizer' )
 		: ! isRetryState && ! running && stats?.remaining_count === 0
@@ -138,6 +141,11 @@ export function BulkOptimizerCard( {
 						</VStack>
 					) }
 
+					{ backupReminderId && (
+						<Text id={ backupReminderId } size={ 12 } variant="muted">
+							{ __( 'Before a bulk run, consider backing up your Media Library. Optimization keeps your original files.', 'kilobyte-image-optimizer' ) }
+						</Text>
+					) }
 					<HStack spacing={ 3 } justify="flex-start" alignment="center" wrap>
 						<Button
 							variant="primary"
@@ -145,6 +153,7 @@ export function BulkOptimizerCard( {
 							icon={ isRetryState ? update : image }
 							isBusy={ activeMode === 'optimize' }
 							disabled={ disabled || running }
+							aria-describedby={ backupReminderId }
 							onClick={ () => ( isRetryState ? onRetryFailed() : onStart( 'optimize' ) ) }
 						>
 							{ primaryLabel }
