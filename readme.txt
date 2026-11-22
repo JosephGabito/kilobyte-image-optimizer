@@ -12,7 +12,7 @@ Unlimited free image optimization. Compress, resize, and optimize images to WebP
 
 == Description ==
 
-**Kilobyte Image Optimizer** is an unlimited, free image optimization plugin for WordPress with **no account, no API key, and no monthly credit limits**. Compress images, resize optimized copies, and convert photos to **WebP** and **AVIF** directly in your browser or on your WordPress site.
+**Kilobyte Image Optimizer** makes smaller **WebP** and **AVIF** copies of your Media Library images. Processing runs in your browser or on your WordPress site.
 
 = Why Optimize Your Images? =
 
@@ -30,15 +30,15 @@ We care about your experience because we are WordPress users too. Kilobyte is de
 = Key Features =
 
 * **Unlimited free image optimization** across your entire Media Library with no account, API key, monthly quota, or thumbnail credit cap.
-* **Automatic image compression on upload** makes smaller copies of supported images after WordPress saves the original. Scheduled tasks handle classic, mobile app, and server-managed REST uploads, and can also finish an interrupted Kilobyte browser job after the original is saved. WordPress's native browser uploader queues optimization after it finishes preparing the media.
+* **Automatic image compression on upload** makes smaller copies after WordPress saves the original. Scheduled tasks handle classic, mobile app, and server-managed REST uploads and can resume an interrupted browser job. Kilobyte queues native uploads after WordPress prepares the image.
 * **Live quality preview & single optimize** lets you compare compression side by side on a supported photo from your Media Library or computer. Switch formats and presets live, then use **Optimize now** for a Media Library image or **Download copy** for a local file.
 * **Selective optimize** lets you multi-select specific Media Library photos (paginated for large selections) to optimize a single post, landing page, or gallery without running a full bulk job.
 * **Bulk image optimization** processes your Media Library with a live ETA, reload protection, per-reason skip totals, links to unavailable Media Library entries, and resume/retry for stopped or failed images while the tab stays open.
 * **WebP & AVIF conversion + static GIF support** converts JPEG, PNG, BMP, and static GIF images to WebP or AVIF while automatically detecting and preserving animated GIFs, APNGs, and animated WebPs.
 * **Browser-first processing + server fallback** runs compression off the main thread in a browser Web Worker when possible (no `exec()` required) and falls back to WordPress's built-in image editor (Imagick or GD) when needed.
 * **Non-destructive originals & one-click restore** keep Media Library files and existing URLs in place, serve smaller copies via `<picture>` with fallback to the original, and let you restore a single image (from the Media Library list or media modal) or use **Restore all**.
-* **Cache-safe 24-hour deferred cleanup** keeps retired copies available for at least 24 hours so cached pages never break, cleans up eligible copies in bounded background batches, and preserves recovery state across reinstalls.
-* **Resize optimized copies** to your maximum width and height while WordPress keeps the uploaded original untouched.
+* **Deferred cleanup after restore** keeps old copies available for at least 24 hours for pages already in cache. WordPress cleans up eligible copies in small batches and keeps cleanup records across reinstalls.
+* **Resize optimized copies** to your maximum width and height.
 * **Regenerate thumbnails** to rebuild registered WordPress image sizes. Identical thumbnails reuse the existing files, and previous thumbnail URLs stay available.
 * **Copyable optimization summary** lets you copy a plain-text report of optimized counts, estimated transfer savings, and active format in one click.
 * **Optional auto alt text & image decoding hints** can fill empty alt text from filenames on upload and hint to browsers how to decode photos.
