@@ -43,12 +43,12 @@ jobs:
 
       - name: Stage release directory
         run: |
-          mkdir -p /tmp/release/kilobyte-image-optimizer
-          rsync -a --exclude-from=.distignore ./ /tmp/release/kilobyte-image-optimizer/
+          mkdir -p dist/release
+          rsync -a --exclude-from=.distignore ./ dist/release/
 
       - name: Run WordPress Plugin Check
         uses: WordPress/plugin-check-action@v1
         with:
-          plugin-path: /tmp/release/kilobyte-image-optimizer
+          build-dir: dist/release
+          slug: kilobyte-image-optimizer
           categories: plugin_repo,security,performance
-          exclude-directories: .git,node_modules,vendor
