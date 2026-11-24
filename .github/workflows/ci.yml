@@ -6,6 +6,72 @@ on:
   pull_request:
 
 jobs:
+  phpunit:
+    name: PHPUnit (PHP ${{ matrix.php }}${{ matrix.multisite == '1' && ', multisite' || '' }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - php: '7.4'
+            coverage: none
+            multisite: '0'
+          - php: '8.4'
+            coverage: none
+            multisite: '1'
+          - php: '8.4'
+            coverage: pcov
+            multisite: '0'
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: kilobyte_tests
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -proot"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+
+    env:
+      WP_TESTS_DB_HOST: 127.0.0.1:3306
+      WP_MULTISITE: ${{ matrix.multisite }}
+      WP_VERSION: '7.1.5'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: gd, mysqli
+          coverage: ${{ matrix.coverage }}
+          tools: composer:v2, wp-cli
+
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --prefer-dist
+
+      - name: Download WordPress
+        run: wp core download --version="$WP_VERSION" --path=.cache/wordpress --skip-content
+
+      - name: Run tests
+        if: matrix.coverage == 'none'
+        run: composer test
+
+      - name: Run tests with coverage
+        if: matrix.coverage == 'pcov'
+        run: composer test:coverage
+
+      - name: Require 90% line coverage
+        if: matrix.coverage == 'pcov'
+        run: php tests/bin/check-coverage.php .cache/coverage/clover.xml 90
+
   lint-and-build:
     name: PHPCS, TypeScript & Build
     runs-on: ubuntu-latest

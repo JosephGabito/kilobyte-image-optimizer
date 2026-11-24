@@ -7,3 +7,5 @@ dist/
 banner.png
 *.zip
 .phpunit.result.cache
+.cache/
+.cache/
