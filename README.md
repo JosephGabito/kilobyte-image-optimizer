@@ -63,6 +63,10 @@ npm run start
 # Auto-fix PHP formatting (WordPress-VIP-Go + WordPress-Extra)
 npm run lint:php:fix
 
+# Run the PHPUnit integration tests (see tests/README.md for the test database setup)
+composer test
+composer test:coverage
+
 # Run PHPCS (uncached), TypeScript check, production build, and headless Plugin Check
 npm run verify
 

@@ -20,3 +20,5 @@ banner.png
 *.zip
 ._*
 __MACOSX
+phpunit.xml.dist
+.cache
