@@ -52,6 +52,13 @@ final class WpOperationLock {
 	public static function acquire( string $lock_name, int $wait, ?bool &$available = null ): ?callable {
 		global $wpdb;
 
+		// SQLite (WordPress Playground and the SQLite Database Integration plugin) has no advisory locks,
+		// so operations run without one there. SQLite sites are usually single-user test sites.
+		if ( is_a( $wpdb, 'WP_SQLite_DB' ) ) {
+			$available = true;
+			return static function (): void {};
+		}
+
 		$key = 'kilobyte_' . md5( DB_NAME . ':' . $wpdb->prefix . ':' . $lock_name );
 
 		$previous = $wpdb->suppress_errors();
