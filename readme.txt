@@ -97,6 +97,14 @@ Restore switches new page requests to the original files. Kilobyte keeps the old
 
 New pages load the files in your Media Library. Uninstall removes your Kilobyte preferences and pauses scheduled optimization and cleanup. Generated copies and recovery records stay in place, so older cached pages can still use those copies. On a single-site install, use **Restore all** and leave Kilobyte active while WordPress runs scheduled cleanup if you want it to remove eligible copies. Stored cleanup work resumes when you reinstall Kilobyte and WordPress can run its scheduled tasks and verify the file references. Very large libraries keep the files and recheck daily whether cleanup can run safely.
 
+== Screenshots ==
+
+1. Live side-by-side Quality preview comparing the original image and its WebP copy in your browser, with one-click Optimize now.
+2. Selective optimize lets you pick specific Media Library photos to optimize without running a full bulk job.
+3. Bulk optimization shows total transfer savings, per-image results, a copyable summary, thumbnail regeneration, and Restore all.
+4. Preference tab with WebP, AVIF, and Keep original formats, compression presets, fine-tuned quality, max dimensions, auto alt text, and image decoding hints.
+5. Media Library attachment details showing the untouched original file, optimization savings, and one-click Restore original.
+
 == Development ==
 
 Source code and issue tracking are hosted on [GitHub](https://github.com/JosephGabito/kilobyte-image-optimizer).

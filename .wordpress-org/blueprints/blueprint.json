@@ -1,0 +1,32 @@
+{
+	"$schema": "https://playground.wordpress.net/blueprint-schema.json",
+	"landingPage": "/wp-admin/upload.php?page=kilobyte-image-optimizer",
+	"preferredVersions": {
+		"php": "8.3",
+		"wp": "latest"
+	},
+	"phpExtensionBundles": [
+		"kitchen-sink"
+	],
+	"steps": [
+		{
+			"step": "runPHP",
+			"code": "<?php require_once '/wordpress/wp-load.php'; require_once ABSPATH . 'wp-admin/includes/file.php'; require_once ABSPATH . 'wp-admin/includes/image.php'; if ( ! function_exists( 'imagecreatetruecolor' ) ) { return; } $samples = array( array( 'name' => 'mountain-sunset.jpg', 'title' => 'Mountain Sunset', 'type' => 'image/jpeg', 'w' => 1600, 'h' => 1067, 'palette' => array( array( 28, 36, 78 ), array( 235, 118, 72 ), array( 248, 204, 112 ) ) ), array( 'name' => 'coastal-morning.png', 'title' => 'Coastal Morning', 'type' => 'image/png', 'w' => 1280, 'h' => 853, 'palette' => array( array( 24, 92, 138 ), array( 92, 178, 206 ), array( 234, 244, 248 ) ) ), array( 'name' => 'botanical-studio.jpg', 'title' => 'Botanical Studio', 'type' => 'image/jpeg', 'w' => 1400, 'h' => 933, 'palette' => array( array( 26, 68, 48 ), array( 92, 148, 96 ), array( 218, 232, 198 ) ) ) ); foreach ( $samples as $idx => $s ) { $im = imagecreatetruecolor( $s['w'], $s['h'] ); $p = $s['palette']; for ( $y = 0; $y < $s['h']; $y += 2 ) { $t = $y / max( 1, $s['h'] - 1 ); $r = (int) ( $p[0][0] * ( 1 - $t ) + $p[1][0] * $t ); $g = (int) ( $p[0][1] * ( 1 - $t ) + $p[1][1] * $t ); $b = (int) ( $p[0][2] * ( 1 - $t ) + $p[1][2] * $t ); imagefilledrectangle( $im, 0, $y, $s['w'], $y + 1, imagecolorallocate( $im, $r, $g, $b ) ); } mt_srand( 4201 + $idx * 97 ); for ( $i = 0; $i < 220; $i++ ) { $c = imagecolorallocatealpha( $im, mt_rand( max( 0, $p[1][0] - 40 ), min( 255, $p[2][0] ) ), mt_rand( max( 0, $p[1][1] - 40 ), min( 255, $p[2][1] ) ), mt_rand( max( 0, $p[1][2] - 40 ), min( 255, $p[2][2] ) ), mt_rand( 40, 105 ) ); imagefilledellipse( $im, mt_rand( 0, $s['w'] ), mt_rand( 0, $s['h'] ), mt_rand( 40, 280 ), mt_rand( 40, 280 ), $c ); } ob_start(); if ( 'image/png' === $s['type'] ) { imagepng( $im, null, 0 ); } else { imagejpeg( $im, null, 98 ); } $bytes = ob_get_clean(); imagedestroy( $im ); $upload = wp_upload_bits( $s['name'], null, $bytes ); if ( ! empty( $upload['error'] ) || empty( $upload['file'] ) ) { continue; } $att_id = wp_insert_attachment( array( 'post_mime_type' => $s['type'], 'post_title' => $s['title'], 'post_status' => 'inherit' ), $upload['file'] ); if ( $att_id && ! is_wp_error( $att_id ) ) { $meta = wp_generate_attachment_metadata( $att_id, $upload['file'] ); wp_update_attachment_metadata( $att_id, $meta ); } }"
+		},
+		{
+			"step": "installPlugin",
+			"pluginData": {
+				"resource": "wordpress.org/plugins",
+				"slug": "kilobyte-image-optimizer"
+			},
+			"options": {
+				"activate": true
+			}
+		},
+		{
+			"step": "login",
+			"username": "admin",
+			"password": "password"
+		}
+	]
+}
