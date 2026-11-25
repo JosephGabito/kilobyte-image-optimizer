@@ -3,6 +3,7 @@
 # Kilobyte Image Optimizer
 
 [![CI & Plugin Check](https://img.shields.io/github/actions/workflow/status/JosephGabito/kilobyte-image-optimizer/ci.yml?branch=main&style=flat-square&label=CI%20%26%20Plugin%20Check)](https://github.com/JosephGabito/kilobyte-image-optimizer/actions/workflows/ci.yml)
+[![Website](https://img.shields.io/badge/Website-kilobyte.gabi.to-3858e9?style=flat-square)](https://kilobyte.gabi.to/)
 [![WordPress.org](https://img.shields.io/wordpress/plugin/v/kilobyte-image-optimizer?style=flat-square&logo=wordpress&logoColor=white&label=WordPress.org)](https://wordpress.org/plugins/kilobyte-image-optimizer/)
 [![Try Live Preview](https://img.shields.io/badge/Live%20Preview-WordPress%20Playground-3858e9?style=flat-square&logo=wordpress&logoColor=white)](https://playground.wordpress.net/?blueprint-url=https://raw.githubusercontent.com/JosephGabito/kilobyte-image-optimizer/main/.wordpress-org/blueprints/blueprint.json)
 [![Tested up to WordPress](https://img.shields.io/wordpress/plugin/tested/kilobyte-image-optimizer?style=flat-square&label=WordPress)](https://wordpress.org/plugins/kilobyte-image-optimizer/)
