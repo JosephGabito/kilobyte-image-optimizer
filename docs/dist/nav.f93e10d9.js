@@ -1,0 +1,1 @@
+document.addEventListener("keydown",e=>{"Escape"===e.key&&document.querySelectorAll(".kb-mobile-nav[open]").forEach(e=>{e.removeAttribute("open");const o=e.querySelector(".kb-mobile-nav-trigger");o?.focus()})});

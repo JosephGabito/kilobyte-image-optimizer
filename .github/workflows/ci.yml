@@ -120,3 +120,39 @@ jobs:
           build-dir: dist/release
           slug: kilobyte-image-optimizer
           categories: plugin_repo,security,performance
+
+  docs-site:
+    name: Standalone Website Build & E2E
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: TypeScript typecheck
+        run: npm run typecheck
+
+      - name: Build WordPress plugin and static standalone site
+        run: |
+          npm run build
+          npm run build:docs
+
+      - name: Verify checked-in docs/ and build/ match fresh production build
+        run: |
+          git diff --exit-code docs/ build/
+          test -z "$(git ls-files --others --exclude-standard docs/ build/)"
+
+      - name: Install Playwright Chromium, Firefox, and WebKit
+        run: npx playwright install --with-deps chromium firefox webkit
+
+      - name: Run unit, SEO, ZIP, and multi-browser E2E tests
+        run: npm run test:docs

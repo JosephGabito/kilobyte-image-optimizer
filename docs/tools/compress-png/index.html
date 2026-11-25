@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<meta name="referrer" content="strict-origin-when-cross-origin" />
+	<meta http-equiv="Content-Security-Policy" content="default-src &#39;self&#39;; script-src &#39;self&#39; &#39;wasm-unsafe-eval&#39;; style-src &#39;self&#39;; img-src &#39;self&#39; blob: data:; font-src &#39;self&#39;; connect-src &#39;self&#39; blob:; worker-src &#39;self&#39;; object-src &#39;none&#39;; base-uri &#39;self&#39;" />
+	<title>Compress PNG Online — Lossy &amp; Lossless | Kilobyte</title>
+	<meta name="description" content="Shrink PNG files locally with indexed RGBA palette quantization or bit-exact lossless OxiPNG. Preserves full alpha transparency with zero uploads." />
+	<link rel="canonical" href="https://kilobyte.gabi.to/tools/compress-png/" />
+
+	<meta property="og:type" content="website" />
+	<meta property="og:site_name" content="Kilobyte" />
+	<meta property="og:url" content="https://kilobyte.gabi.to/tools/compress-png/" />
+	<meta property="og:title" content="Compress PNG Online — Lossy &amp; Lossless | Kilobyte" />
+	<meta property="og:description" content="Shrink PNG files locally with indexed RGBA palette quantization or bit-exact lossless OxiPNG. Preserves full alpha transparency with zero uploads." />
+	<meta property="og:image" content="https://kilobyte.gabi.to/assets/og-card-1200x630.jpg" />
+	<meta property="og:image:width" content="1200" />
+	<meta property="og:image:height" content="630" />
+	<meta property="og:image:alt" content="Kilobyte — Free browser-powered WebP, AVIF, JPEG, and PNG image optimization tools and WordPress plugin." />
+	<meta name="twitter:card" content="summary_large_image" />
+	<meta name="twitter:title" content="Compress PNG Online — Lossy &amp; Lossless | Kilobyte" />
+	<meta name="twitter:description" content="Shrink PNG files locally with indexed RGBA palette quantization or bit-exact lossless OxiPNG. Preserves full alpha transparency with zero uploads." />
+	<meta name="twitter:image" content="https://kilobyte.gabi.to/assets/og-card-1200x630.jpg" />
+	<meta name="twitter:image:alt" content="Kilobyte — Free browser-powered WebP, AVIF, JPEG, and PNG image optimization tools and WordPress plugin." />
+
+	<link rel="icon" type="image/png" href="/assets/icon-128x128.png" />
+	<link rel="preload" as="font" href="/assets/fonts/eb-garamond-latin-wght-normal.woff2" type="font/woff2" crossorigin />
+	<link rel="preload" as="font" href="/assets/fonts/inter-latin-wght-normal.woff2" type="font/woff2" crossorigin />
+	<link rel="stylesheet" href="/dist/site.f3bf5b37.css" />
+	<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","@id":"https://kilobyte.gabi.to/tools/compress-png/#app","name":"Kilobyte Compress PNG","url":"https://kilobyte.gabi.to/tools/compress-png/","description":"Shrink PNG files locally with indexed RGBA palette quantization or bit-exact lossless OxiPNG. Preserves full alpha transparency with zero uploads.","applicationCategory":"MultimediaApplication","operatingSystem":"Any (Web Browser)","browserRequirements":"Requires JavaScript and HTML5 Canvas / WebAssembly support.","image":"https://kilobyte.gabi.to/assets/og-card-1200x630.jpg","license":"https://www.gnu.org/licenses/gpl-2.0.html","author":{"@type":"Person","@id":"https://kilobyte.gabi.to/#author","name":"Joseph Gabito","url":"https://joseph.gabi.to"},"isPartOf":{"@id":"https://kilobyte.gabi.to/#website"},"featureList":["100% local in-browser processing with zero file uploads","Output formats: PNG, WebP, AVIF","Encoder: UPNG indexed RGBA quantizer + self-hosted OxiPNG WASM","Real measured byte deltas and output signature verification"],"isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}}</script>
+	<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Kilobyte","item":"https://kilobyte.gabi.to/"},{"@type":"ListItem","position":2,"name":"Tools","item":"https://kilobyte.gabi.to/tools/"},{"@type":"ListItem","position":3,"name":"Compress PNG","item":"https://kilobyte.gabi.to/tools/compress-png/"}]}</script>
+	<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Does PNG compression keep my transparent background?","acceptedAnswer":{"@type":"Answer","text":"Yes. Both Palette quantization (indexed RGBA with tRNS alpha table) and Lossless OxiPNG preserve full alpha transparency, including semi-transparent shadows and anti-aliased edges."}},{"@type":"Question","name":"How is this different from browser Canvas PNG export?","acceptedAnswer":{"@type":"Answer","text":"HTML5 Canvas cannot quantize PNG palettes or optimize DEFLATE streams, so it often makes PNGs bigger. Kilobyte uses UPNG palette quantization paired with the Rust-based OxiPNG WebAssembly optimizer."}},{"@type":"Question","name":"Why does Lossless mode disable the quality slider?","acceptedAnswer":{"@type":"Answer","text":"Lossless optimization cannot discard any color information—it preserves exact RGBA pixels while stripping ancillary metadata and searching for tighter DEFLATE/filter encodings."}}]}</script>
+</head>
+<body>
+<a class="kb-skip-link" href="#main-content">Skip to main content</a>
+<header class="kb-topbar">
+	<div class="kb-container kb-topbar-inner">
+		<div class="kb-topbar-left">
+			<a class="kb-brand" href="/" aria-label="Kilobyte home">Kilobyte</a>
+			<nav class="kb-nav" aria-label="Primary navigation">
+			<a href="/tools/">All tools</a>
+			<a href="/tools/compress-image/">Compress</a>
+			<a href="/tools/#cat-convert">Convert</a>
+			<a href="/tools/resize-image/">Resize</a>
+			<a href="/tools/bulk-image-compressor/">Bulk</a>
+			<a href="/">WordPress plugin</a>
+			</nav>
+		</div>
+		<div class="kb-topbar-actions">
+			<a class="kb-topbar-link kb-topbar-github" href="https://github.com/JosephGabito/kilobyte-image-optimizer" target="_blank" rel="noopener noreferrer">GitHub</a>
+			<a class="kb-btn kb-btn-primary kb-topbar-cta" href="https://wordpress.org/plugins/kilobyte-image-optimizer/" target="_blank" rel="noopener noreferrer">Get WP plugin</a>
+			<details class="kb-mobile-nav">
+				<summary class="kb-mobile-nav-trigger" aria-label="Toggle navigation menu"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M4 7.5h16V6H4v1.5zm0 5.25h16v-1.5H4v1.5zM4 18h16v-1.5H4V18z"/></svg><span>Menu</span></summary>
+				<nav class="kb-mobile-nav-panel" aria-label="Mobile navigation">
+				<a href="/tools/">All tools</a>
+				<a href="/tools/compress-image/">Compress</a>
+				<a href="/tools/#cat-convert">Convert</a>
+				<a href="/tools/resize-image/">Resize</a>
+				<a href="/tools/bulk-image-compressor/">Bulk</a>
+				<a href="/">WordPress plugin</a>
+					<a href="https://github.com/JosephGabito/kilobyte-image-optimizer" target="_blank" rel="noopener noreferrer">GitHub</a>
+				</nav>
+			</details>
+		</div>
+	</div>
+</header>
+<main id="main-content">
+	<section class="kb-tool-hero">
+		<div class="kb-container">
+			<nav class="kb-breadcrumbs" aria-label="Breadcrumb">
+				<a href="/">Kilobyte</a>
+				<span aria-hidden="true">/</span>
+				<a href="/tools/">Tools</a>
+				<span aria-hidden="true">/</span>
+				<span aria-current="page">Compress PNG</span>
+			</nav>
+
+			<div class="kb-tool-hero-head">
+				<h1>Compress PNG images with full transparency.</h1>
+				<p class="kb-lead">Choose indexed RGBA palette quantization for high-ratio PNG reductions, or bit-exact lossless OxiPNG optimization when every pixel must remain identical. Runs 100% locally in your browser.</p>
+			</div>
+
+			<div class="kb-card kb-lab-card" id="kb-tool-compress-png" data-tool-widget>
+	<script type="application/json" data-role="tool-config">{"slug":"compress-png","accept":"image/png,.png","defaultOutputMime":"image/png","allowedOutputMimes":["image/png","image/webp","image/avif"],"defaultQuality":82,"defaultPngMode":"lossy","showResize":false,"batchFocused":false,"sampleUrl":null,"autoLoadSample":false,"workerUrl":"/dist/tool-worker.1827992f.js"}</script>
+
+	<div class="kb-card-header">
+		<h2 class="kb-h3">Compress PNG</h2>
+		<div class="kb-lab-buttons">
+			<button type="button" class="kb-btn kb-btn-primary" data-role="pick-btn"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18.5 15v3.5H13V6.7l4.5 4.1 1-1.1-6.2-5.8-5.8 5.8 1 1.1 4-4v11.7h-6V15H4v5h16v-5h-1.5z"/></svg><span>Choose image</span></button>
+			<input type="file" class="sr-only" tabindex="-1" aria-hidden="true" accept="image/png,.png" multiple data-role="file-input" />
+
+			<button type="button" class="kb-btn kb-btn-danger" data-role="cancel-btn" hidden>Cancel</button>
+			<button type="button" class="kb-btn kb-btn-ghost" data-role="clear-btn" hidden>Clear</button>
+		</div>
+	</div>
+
+	<div class="kb-card-body kb-lab-body">
+		<div class="kb-dropzone" data-role="dropzone" role="button" tabindex="0">
+			<p class="kb-dropzone-title">Drop one or more images here, or click to browse</p>
+			<p class="kb-small">Accepts PNG images (up to 24 MB / 40 MP). Processed 100% locally in your browser.</p>
+		</div>
+
+		<div class="kb-lab-controls">
+			<div class="kb-control-group">
+			<span class="kb-control-label">Output format</span>
+			<div class="kb-seg" role="group" aria-label="Output format"><button type="button" class="kb-seg-btn is-active" data-role="format-btn" data-mime="image/png" aria-pressed="true">PNG</button><button type="button" class="kb-seg-btn" data-role="format-btn" data-mime="image/webp" aria-pressed="false">WebP</button><button type="button" class="kb-seg-btn" data-role="format-btn" data-mime="image/avif" aria-pressed="false">AVIF</button></div>
+		</div>
+			<div class="kb-control-group" data-role="preset-group">
+			<span class="kb-control-label">Compression preset</span>
+			<div class="kb-seg" role="group" aria-label="Compression preset">
+				<button type="button" class="kb-seg-btn" data-role="preset-btn" data-quality="90" aria-pressed="false">High</button>
+				<button type="button" class="kb-seg-btn is-active" data-role="preset-btn" data-quality="82" aria-pressed="true">Balanced</button>
+				<button type="button" class="kb-seg-btn" data-role="preset-btn" data-quality="72" aria-pressed="false">Smallest</button>
+			</div>
+		</div>
+			<div class="kb-control-group" data-role="quality-group">
+			<label class="kb-control-label" for="kb-tool-compress-png-quality">
+				<span>Quality</span>
+				<span class="kb-control-val" data-role="quality-val">82</span>
+			</label>
+			<input id="kb-tool-compress-png-quality" class="kb-range" type="range" min="40" max="95" value="82" data-role="quality-input" />
+		</div>
+			<div class="kb-control-group" data-role="png-mode-group">
+			<span class="kb-control-label">PNG mode</span>
+			<div class="kb-seg" role="group" aria-label="PNG optimization mode">
+				<button type="button" class="kb-seg-btn is-active" data-role="png-mode-btn" data-mode="lossy" aria-pressed="true">Palette (smaller)</button>
+				<button type="button" class="kb-seg-btn" data-role="png-mode-btn" data-mode="lossless" aria-pressed="false">Lossless</button>
+			</div>
+		</div>
+		</div>
+
+
+
+		<div class="kb-notice-wrap" aria-live="polite" aria-atomic="true">
+			<div class="kb-notice" role="status" data-role="notice" hidden></div>
+		</div>
+
+		<div data-role="single-view">
+			<dl class="kb-lab-stats">
+				<div class="kb-lab-stat">
+					<dt data-role="orig-label">Original</dt>
+					<dd class="kb-lab-stat-value" data-role="orig-size">--</dd>
+					<dd class="kb-lab-stat-note" data-role="orig-dims">Waiting for image</dd>
+				</div>
+				<div class="kb-lab-stat">
+					<dt data-role="opt-label">Output (PNG)</dt>
+					<dd class="kb-lab-stat-value" data-role="opt-size">--</dd>
+					<dd class="kb-lab-stat-note" data-role="opt-meta">Local encoder ready</dd>
+				</div>
+				<div class="kb-lab-stat" data-role="savings-stat">
+					<dt>Measured change</dt>
+					<dd class="kb-lab-stat-value" data-role="savings-val">--</dd>
+					<dd class="kb-lab-stat-note" data-role="savings-note">Select an image to measure</dd>
+				</div>
+			</dl>
+
+			<div class="kb-compare-stage kb-checkerboard" data-role="compare-stage">
+				<img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" width="1" height="1" alt="Original image preview" class="kb-compare-img kb-compare-before" data-role="before-img" hidden />
+				<div class="kb-compare-after" data-role="after-wrap">
+					<img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" width="1" height="1" alt="Optimized image preview" class="kb-compare-img" data-role="after-img" hidden />
+				</div>
+				<span class="kb-compare-tag kb-compare-tag-left" data-role="left-tag" hidden>Original</span>
+				<span class="kb-compare-tag kb-compare-tag-right" data-role="right-tag" hidden>PNG</span>
+				<input type="range" min="0" max="100" value="50" class="kb-compare-range" data-role="split-range" aria-label="Slide to compare original and optimized image" disabled hidden />
+				<div class="kb-compare-divider" data-role="split-divider" aria-hidden="true" hidden>
+					<span class="kb-compare-handle">&harr;</span>
+				</div>
+				<div class="kb-compare-empty" data-role="empty-stage">
+					Drop or choose an image above to preview before and after locally.
+				</div>
+			</div>
+		</div>
+
+		<div class="kb-batch-wrap" data-role="batch-view" hidden>
+			<div class="kb-batch-summary" aria-live="polite">
+				<div>
+					<strong data-role="batch-headline">No images queued yet.</strong>
+					<p class="kb-small" data-role="batch-subline">Drop multiple files to process up to 3 concurrently in browser Web Workers.</p>
+				</div>
+				<div class="kb-lab-buttons">
+					<button type="button" class="kb-btn kb-btn-primary" data-role="zip-btn" disabled><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18 11.3l-1-1.1-4 4V3h-1.5v11.3L7 10.2l-1 1.1 6.2 5.8 5.8-5.8zm.5 3.7v3.5h-13V15H4v5h16v-5h-1.5z"/></svg><span>Download all (.zip)</span></button>
+				</div>
+			</div>
+			<ul class="kb-batch-list" data-role="batch-list"></ul>
+		</div>
+
+		<noscript>
+			<div class="kb-notice is-warning">
+				Enable JavaScript to run the local browser image encoder on this page. Your images are never uploaded to any server.
+			</div>
+		</noscript>
+	</div>
+
+	<div class="kb-card-footer">
+		<p class="kb-small" data-role="status-line" role="status" aria-live="polite">100% local browser processing. Your image files never leave your device.</p>
+		<button type="button" class="kb-btn kb-btn-secondary" data-role="download-placeholder" disabled><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18 11.3l-1-1.1-4 4V3h-1.5v11.3L7 10.2l-1 1.1 6.2 5.8 5.8-5.8zm.5 3.7v3.5h-13V15H4v5h16v-5h-1.5z"/></svg><span data-role="download-placeholder-label">Download PNG</span></button>
+		<a class="kb-btn kb-btn-secondary" data-role="download-btn" hidden><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18 11.3l-1-1.1-4 4V3h-1.5v11.3L7 10.2l-1 1.1 6.2 5.8 5.8-5.8zm.5 3.7v3.5h-13V15H4v5h16v-5h-1.5z"/></svg><span data-role="download-label">Download PNG</span></a>
+	</div>
+</div>
+<aside class="kb-wp-callout" data-role="wp-callout" aria-label="Kilobyte for WordPress">
+	<p><strong>Running a WordPress website?</strong> Kilobyte automatically optimizes your images as you upload them, keeping every original file and URL intact.</p>
+	<div class="kb-lab-buttons">
+		<a class="kb-btn kb-btn-primary" href="https://wordpress.org/plugins/kilobyte-image-optimizer/" target="_blank" rel="noopener noreferrer"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18 11.3l-1-1.1-4 4V3h-1.5v11.3L7 10.2l-1 1.1 6.2 5.8 5.8-5.8zm.5 3.7v3.5h-13V15H4v5h16v-5h-1.5z"/></svg><span>Get Kilobyte for WordPress</span></a>
+		<a class="kb-btn kb-btn-secondary" href="/"><span>Learn how it works</span></a>
+	</div>
+</aside>
+		</div>
+	</section>
+
+	<section class="kb-section kb-section-compact">
+		<div class="kb-container kb-guide-grid">
+			<div class="kb-guide-main">
+				<article class="kb-guide-block">
+					<h2>How to use Compress PNG</h2>
+					<ol class="kb-steps-list">
+						<li>Drop your PNG screenshot, UI mockup, logo, or transparent graphic onto the card above.</li>
+<li>Choose Palette (smaller) for indexed RGBA quantization, or Lossless for pixel-identical OxiPNG optimization.</li>
+<li>Inspect transparent edges against the checkerboard preview and click Download PNG.</li>
+					</ol>
+				</article>
+
+				<article class="kb-guide-block">
+					<h2>Lossy palette quantization vs. lossless PNG optimization</h2>
+					<p class="kb-body">Standard browser Canvas encoding writes uncompressed or weakly deflated 32-bit RGBA PNGs and ignores quality sliders altogether. Kilobyte avoids that trap by using two dedicated local PNG engines.</p>
+<p class="kb-body">In Palette mode, Kilobyte reduces 24-bit and 32-bit PNGs to an optimized indexed RGBA color palette (64 to 256 colors) while preserving full semi-transparent alpha channels, then runs an OxiPNG WebAssembly deflate pass for additional lossless compaction. In Lossless mode, PNG inputs are optimized directly by OxiPNG without Canvas conversion—preserving bit-exact pixel values, 16-bit precision whenever samples require more than 8 bits, semi-transparent RGBA values, and embedded ICC color profiles while stripping EXIF and text metadata chunks.</p>
+					<ul class="kb-bullets-list"><li>Palette quantization excels on UI screenshots, icons, charts, and web illustrations.</li><li>Lossless OxiPNG is ideal for pixel art, strict brand assets, and smooth photographic gradients where banding must never occur.</li><li>Every output is verified against both the 8-byte PNG signature and complete IEND trailer before download.</li></ul>
+				</article>
+<article class="kb-guide-block">
+					<h2>When PNG should actually be WebP or AVIF</h2>
+					<p class="kb-body">If your PNG is a large photograph or a hero image with soft shadows, even a quantized 8-bit PNG will stay larger than a WebP or AVIF file. You can switch output format right in the toolbar to compare PNG against WebP or AVIF on your exact image.</p>
+
+				</article>
+
+				<article class="kb-guide-block">
+					<h2>Honest capabilities and browser limits</h2>
+					<ul class="kb-bullets-list">
+						<li>Animated PNGs (APNGs) are skipped so multi-frame animation data is never destroyed.</li>
+<li>Lossy quantization maps colors to at most 256 palette entries; subtle 24-bit photographic gradients may show mild banding at lower quality—switch to Lossless mode or WebP/AVIF if you spot banding.</li>
+<li>On first use, Kilobyte lazy-loads a ~160 KB self-hosted OxiPNG WebAssembly module from this site; images never leave your browser.</li>
+					</ul>
+				</article>
+			</div>
+
+			<aside class="kb-guide-aside" aria-label="Compress PNG specifications and related utilities">
+				<div class="kb-aside-card">
+					<h2>Tool specifications</h2>
+					<dl class="kb-spec-list">
+						<div>
+							<dt>Accepted inputs</dt>
+							<dd>PNG images (up to 24 MB / 40 MP)</dd>
+						</div>
+						<div>
+							<dt>Output formats</dt>
+							<dd>PNG, WebP, AVIF</dd>
+						</div>
+						<div>
+							<dt>Local encoder</dt>
+							<dd>UPNG indexed RGBA quantizer + self-hosted OxiPNG WASM</dd>
+						</div>
+						<div>
+							<dt>Privacy</dt>
+							<dd>100% in-browser; zero uploads, accounts, or quotas</dd>
+						</div>
+						<div>
+							<dt>Safety bounds</dt>
+							<dd>24 MB, 40 MP, 16,384 px/side; 150 MB ZIP</dd>
+						</div>
+					</dl>
+				</div>
+
+				<div class="kb-aside-card">
+					<h2>Related utilities</h2>
+					<ul class="kb-related-links">
+						<li><a href="/tools/png-to-webp/"><span>PNG to WebP</span><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13.5 6l-1.1 1.1 4.1 4.1H4v1.5h12.5l-4.1 4.1 1.1 1.1 6-6-6-6z"/></svg></a></li>
+<li><a href="/tools/png-to-avif/"><span>PNG to AVIF</span><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13.5 6l-1.1 1.1 4.1 4.1H4v1.5h12.5l-4.1 4.1 1.1 1.1 6-6-6-6z"/></svg></a></li>
+<li><a href="/tools/compress-image/"><span>Compress Image</span><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13.5 6l-1.1 1.1 4.1 4.1H4v1.5h12.5l-4.1 4.1 1.1 1.1 6-6-6-6z"/></svg></a></li>
+<li><a href="/tools/bulk-image-compressor/"><span>Bulk Image Compressor</span><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13.5 6l-1.1 1.1 4.1 4.1H4v1.5h12.5l-4.1 4.1 1.1 1.1 6-6-6-6z"/></svg></a></li>
+						<li><a href="/tools/"><span>View all 9 tools</span><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13.5 6l-1.1 1.1 4.1 4.1H4v1.5h12.5l-4.1 4.1 1.1 1.1 6-6-6-6z"/></svg></a></li>
+					</ul>
+				</div>
+			</aside>
+		</div>
+	</section>
+
+	<section class="kb-section kb-section-compact kb-section-wash">
+		<div class="kb-container kb-grid">
+			<div class="kb-faq-head">
+				<p class="kb-kicker">Questions</p>
+				<h2 class="kb-title">Compress PNG FAQ</h2>
+			</div>
+			<div class="kb-faq-list">
+				<details class="kb-faq-item" open>
+					<summary>
+						<span class="kb-h3">Does PNG compression keep my transparent background?</span>
+						<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.5 11.6L12 16l-5.5-4.4.9-1.2L12 14l4.5-3.6 1 1.2z"/></svg>
+					</summary>
+					<p class="kb-body">Yes. Both Palette quantization (indexed RGBA with tRNS alpha table) and Lossless OxiPNG preserve full alpha transparency, including semi-transparent shadows and anti-aliased edges.</p>
+				</details>
+<details class="kb-faq-item">
+					<summary>
+						<span class="kb-h3">How is this different from browser Canvas PNG export?</span>
+						<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.5 11.6L12 16l-5.5-4.4.9-1.2L12 14l4.5-3.6 1 1.2z"/></svg>
+					</summary>
+					<p class="kb-body">HTML5 Canvas cannot quantize PNG palettes or optimize DEFLATE streams, so it often makes PNGs bigger. Kilobyte uses UPNG palette quantization paired with the Rust-based OxiPNG WebAssembly optimizer.</p>
+				</details>
+<details class="kb-faq-item">
+					<summary>
+						<span class="kb-h3">Why does Lossless mode disable the quality slider?</span>
+						<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.5 11.6L12 16l-5.5-4.4.9-1.2L12 14l4.5-3.6 1 1.2z"/></svg>
+					</summary>
+					<p class="kb-body">Lossless optimization cannot discard any color information—it preserves exact RGBA pixels while stripping ancillary metadata and searching for tighter DEFLATE/filter encodings.</p>
+				</details>
+			</div>
+		</div>
+	</section>
+</main>
+<footer class="kb-footer">
+	<div class="kb-container kb-footer-inner">
+		<div class="kb-footer-brand">
+			<img src="/assets/icon-128x128.png" alt="" width="24" height="24" />
+			<p class="kb-small">Kilobyte is free, open-source image optimization software under the GPL, version 2 or later. All browser utilities run 100% locally on your device.</p>
+		</div>
+		<nav class="kb-footer-links kb-small" aria-label="Footer navigation">
+			<a href="/">WordPress plugin</a>
+			<a href="/tools/">Browser tools</a>
+			<a href="https://wordpress.org/plugins/kilobyte-image-optimizer/" target="_blank" rel="noopener noreferrer">WordPress.org listing</a>
+			<a href="https://wordpress.org/support/plugin/kilobyte-image-optimizer/" target="_blank" rel="noopener noreferrer">Support forum</a>
+			<a href="https://github.com/JosephGabito/kilobyte-image-optimizer" target="_blank" rel="noopener noreferrer">Source code on GitHub</a>
+			<a href="/THIRD-PARTY-LICENSES.txt">Third-party licenses</a>
+			<a href="https://joseph.gabi.to" target="_blank" rel="noopener noreferrer">Made by Joseph Gabito</a>
+		</nav>
+	</div>
+</footer>
+	<script src="/dist/tool.8b1fbd1c.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<meta name="referrer" content="strict-origin-when-cross-origin" />
+	<meta http-equiv="Content-Security-Policy" content="default-src &#39;self&#39;; script-src &#39;self&#39; &#39;wasm-unsafe-eval&#39;; style-src &#39;self&#39;; img-src &#39;self&#39; blob: data:; font-src &#39;self&#39;; connect-src &#39;self&#39; blob:; worker-src &#39;self&#39;; object-src &#39;none&#39;; base-uri &#39;self&#39;" />
+	<title>Resize Image Online — Exact Pixels &amp; Lock | Kilobyte</title>
+	<meta name="description" content="Resize JPEG, PNG, WebP, AVIF, static GIF, and BMP images in your browser with aspect-ratio lock, no-upscale protection, and zero server uploads." />
+	<link rel="canonical" href="https://kilobyte.gabi.to/tools/resize-image/" />
+
+	<meta property="og:type" content="website" />
+	<meta property="og:site_name" content="Kilobyte" />
+	<meta property="og:url" content="https://kilobyte.gabi.to/tools/resize-image/" />
+	<meta property="og:title" content="Resize Image Online — Exact Pixels &amp; Lock | Kilobyte" />
+	<meta property="og:description" content="Resize JPEG, PNG, WebP, AVIF, static GIF, and BMP images in your browser with aspect-ratio lock, no-upscale protection, and zero server uploads." />
+	<meta property="og:image" content="https://kilobyte.gabi.to/assets/og-card-1200x630.jpg" />
+	<meta property="og:image:width" content="1200" />
+	<meta property="og:image:height" content="630" />
+	<meta property="og:image:alt" content="Kilobyte — Free browser-powered WebP, AVIF, JPEG, and PNG image optimization tools and WordPress plugin." />
+	<meta name="twitter:card" content="summary_large_image" />
+	<meta name="twitter:title" content="Resize Image Online — Exact Pixels &amp; Lock | Kilobyte" />
+	<meta name="twitter:description" content="Resize JPEG, PNG, WebP, AVIF, static GIF, and BMP images in your browser with aspect-ratio lock, no-upscale protection, and zero server uploads." />
+	<meta name="twitter:image" content="https://kilobyte.gabi.to/assets/og-card-1200x630.jpg" />
+	<meta name="twitter:image:alt" content="Kilobyte — Free browser-powered WebP, AVIF, JPEG, and PNG image optimization tools and WordPress plugin." />
+
+	<link rel="icon" type="image/png" href="/assets/icon-128x128.png" />
+	<link rel="preload" as="font" href="/assets/fonts/eb-garamond-latin-wght-normal.woff2" type="font/woff2" crossorigin />
+	<link rel="preload" as="font" href="/assets/fonts/inter-latin-wght-normal.woff2" type="font/woff2" crossorigin />
+	<link rel="stylesheet" href="/dist/site.f3bf5b37.css" />
+	<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","@id":"https://kilobyte.gabi.to/tools/resize-image/#app","name":"Kilobyte Resize Image","url":"https://kilobyte.gabi.to/tools/resize-image/","description":"Resize JPEG, PNG, WebP, AVIF, static GIF, and BMP images in your browser with aspect-ratio lock, no-upscale protection, and zero server uploads.","applicationCategory":"MultimediaApplication","operatingSystem":"Any (Web Browser)","browserRequirements":"Requires JavaScript and HTML5 Canvas / WebAssembly support.","image":"https://kilobyte.gabi.to/assets/og-card-1200x630.jpg","license":"https://www.gnu.org/licenses/gpl-2.0.html","author":{"@type":"Person","@id":"https://kilobyte.gabi.to/#author","name":"Joseph Gabito","url":"https://joseph.gabi.to"},"isPartOf":{"@id":"https://kilobyte.gabi.to/#website"},"featureList":["100% local in-browser processing with zero file uploads","Output formats: WebP, JPEG, PNG, AVIF","Encoder: High-quality Canvas resampling + WebP, JPEG, PNG, AVIF encoders","Real measured byte deltas and output signature verification"],"isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}}</script>
+	<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Kilobyte","item":"https://kilobyte.gabi.to/"},{"@type":"ListItem","position":2,"name":"Tools","item":"https://kilobyte.gabi.to/tools/"},{"@type":"ListItem","position":3,"name":"Resize Image","item":"https://kilobyte.gabi.to/tools/resize-image/"}]}</script>
+	<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Will resizing stretch or distort my photo?","acceptedAnswer":{"@type":"Answer","text":"Not with Keep aspect ratio checked (the default). Kilobyte computes proportional dimensions automatically so images stay sharp and undistorted."}},{"@type":"Question","name":"What does \"Never upscale\" do?","acceptedAnswer":{"@type":"Answer","text":"If your source photo is 900 px wide and you request 1600 px, Kilobyte keeps it at 900 px rather than enlarging it into a blurry, heavier file. You can uncheck Never upscale if you explicitly need upscaling."}},{"@type":"Question","name":"Can I resize and convert to WebP in one step?","acceptedAnswer":{"@type":"Answer","text":"Yes. Choose WebP, AVIF, JPEG, or PNG in the output format control and Kilobyte resizes and encodes in a single local pass."}}]}</script>
+</head>
+<body>
+<a class="kb-skip-link" href="#main-content">Skip to main content</a>
+<header class="kb-topbar">
+	<div class="kb-container kb-topbar-inner">
+		<div class="kb-topbar-left">
+			<a class="kb-brand" href="/" aria-label="Kilobyte home">Kilobyte</a>
+			<nav class="kb-nav" aria-label="Primary navigation">
+			<a href="/tools/">All tools</a>
+			<a href="/tools/compress-image/">Compress</a>
+			<a href="/tools/#cat-convert">Convert</a>
+			<a href="/tools/resize-image/" aria-current="page">Resize</a>
+			<a href="/tools/bulk-image-compressor/">Bulk</a>
+			<a href="/">WordPress plugin</a>
+			</nav>
+		</div>
+		<div class="kb-topbar-actions">
+			<a class="kb-topbar-link kb-topbar-github" href="https://github.com/JosephGabito/kilobyte-image-optimizer" target="_blank" rel="noopener noreferrer">GitHub</a>
+			<a class="kb-btn kb-btn-primary kb-topbar-cta" href="https://wordpress.org/plugins/kilobyte-image-optimizer/" target="_blank" rel="noopener noreferrer">Get WP plugin</a>
+			<details class="kb-mobile-nav">
+				<summary class="kb-mobile-nav-trigger" aria-label="Toggle navigation menu"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M4 7.5h16V6H4v1.5zm0 5.25h16v-1.5H4v1.5zM4 18h16v-1.5H4V18z"/></svg><span>Menu</span></summary>
+				<nav class="kb-mobile-nav-panel" aria-label="Mobile navigation">
+				<a href="/tools/">All tools</a>
+				<a href="/tools/compress-image/">Compress</a>
+				<a href="/tools/#cat-convert">Convert</a>
+				<a href="/tools/resize-image/" aria-current="page">Resize</a>
+				<a href="/tools/bulk-image-compressor/">Bulk</a>
+				<a href="/">WordPress plugin</a>
+					<a href="https://github.com/JosephGabito/kilobyte-image-optimizer" target="_blank" rel="noopener noreferrer">GitHub</a>
+				</nav>
+			</details>
+		</div>
+	</div>
+</header>
+<main id="main-content">
+	<section class="kb-tool-hero">
+		<div class="kb-container">
+			<nav class="kb-breadcrumbs" aria-label="Breadcrumb">
+				<a href="/">Kilobyte</a>
+				<span aria-hidden="true">/</span>
+				<a href="/tools/">Tools</a>
+				<span aria-hidden="true">/</span>
+				<span aria-current="page">Resize Image</span>
+			</nav>
+
+			<div class="kb-tool-hero-head">
+				<h1>Resize images to exact pixel dimensions.</h1>
+				<p class="kb-lead">Scale down oversized camera photos, blog headers, and product images locally with high-quality resampling, aspect-ratio locking, and optional format conversion.</p>
+			</div>
+
+			<div class="kb-card kb-lab-card" id="kb-tool-resize-image" data-tool-widget>
+	<script type="application/json" data-role="tool-config">{"slug":"resize-image","accept":"image/jpeg,image/png,image/webp,image/avif,image/gif,image/bmp","defaultOutputMime":"image/webp","allowedOutputMimes":["image/webp","image/jpeg","image/png","image/avif"],"defaultQuality":85,"defaultPngMode":"lossy","showResize":true,"batchFocused":false,"sampleUrl":"/assets/sample-photo.jpg","autoLoadSample":true,"workerUrl":"/dist/tool-worker.1827992f.js"}</script>
+
+	<div class="kb-card-header">
+		<h2 class="kb-h3">Resize Image</h2>
+		<div class="kb-lab-buttons">
+			<button type="button" class="kb-btn kb-btn-primary" data-role="pick-btn"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18.5 15v3.5H13V6.7l4.5 4.1 1-1.1-6.2-5.8-5.8 5.8 1 1.1 4-4v11.7h-6V15H4v5h16v-5h-1.5z"/></svg><span>Choose image</span></button>
+			<input type="file" class="sr-only" tabindex="-1" aria-hidden="true" accept="image/jpeg,image/png,image/webp,image/avif,image/gif,image/bmp" multiple data-role="file-input" />
+			<button type="button" class="kb-btn kb-btn-ghost" data-role="sample-btn"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 5V2L8 6l4 4V7c3.3 0 6 2.7 6 6s-2.7 6-6 6-6-2.7-6-6H4c0 4.4 3.6 8 8 8s8-3.6 8-8-3.6-8-8-8z"/></svg><span>Use sample photo</span></button>
+			<button type="button" class="kb-btn kb-btn-danger" data-role="cancel-btn" hidden>Cancel</button>
+			<button type="button" class="kb-btn kb-btn-ghost" data-role="clear-btn" hidden>Clear</button>
+		</div>
+	</div>
+
+	<div class="kb-card-body kb-lab-body">
+		<div class="kb-dropzone" data-role="dropzone" role="button" tabindex="0">
+			<p class="kb-dropzone-title">Drop one or more images here, or click to browse</p>
+			<p class="kb-small">Accepts JPEG, PNG, WebP, AVIF, still GIF, or BMP (up to 24 MB / 40 MP). Processed 100% locally in your browser.</p>
+		</div>
+
+		<div class="kb-lab-controls">
+			<div class="kb-control-group">
+			<span class="kb-control-label">Output format</span>
+			<div class="kb-seg" role="group" aria-label="Output format"><button type="button" class="kb-seg-btn is-active" data-role="format-btn" data-mime="image/webp" aria-pressed="true">WebP</button><button type="button" class="kb-seg-btn" data-role="format-btn" data-mime="image/jpeg" aria-pressed="false">JPEG</button><button type="button" class="kb-seg-btn" data-role="format-btn" data-mime="image/png" aria-pressed="false">PNG</button><button type="button" class="kb-seg-btn" data-role="format-btn" data-mime="image/avif" aria-pressed="false">AVIF</button></div>
+		</div>
+
+			<div class="kb-control-group" data-role="quality-group">
+			<label class="kb-control-label" for="kb-tool-resize-image-quality">
+				<span>Quality</span>
+				<span class="kb-control-val" data-role="quality-val">85</span>
+			</label>
+			<input id="kb-tool-resize-image-quality" class="kb-range" type="range" min="40" max="95" value="85" data-role="quality-input" />
+		</div>
+			<div class="kb-control-group" data-role="png-mode-group" hidden>
+			<span class="kb-control-label">PNG mode</span>
+			<div class="kb-seg" role="group" aria-label="PNG optimization mode">
+				<button type="button" class="kb-seg-btn is-active" data-role="png-mode-btn" data-mode="lossy" aria-pressed="true">Palette (smaller)</button>
+				<button type="button" class="kb-seg-btn" data-role="png-mode-btn" data-mode="lossless" aria-pressed="false">Lossless</button>
+			</div>
+		</div>
+		</div>
+
+		<div class="kb-resize-grid" data-role="resize-controls">
+			<div class="kb-control-group">
+				<label class="kb-control-label" for="kb-tool-resize-image-width">Width (px)</label>
+				<input id="kb-tool-resize-image-width" class="kb-input" type="number" min="1" max="12000" inputmode="numeric" placeholder="Auto" data-role="resize-width" />
+			</div>
+			<div class="kb-control-group">
+				<label class="kb-control-label" for="kb-tool-resize-image-height">Height (px)</label>
+				<input id="kb-tool-resize-image-height" class="kb-input" type="number" min="1" max="12000" inputmode="numeric" placeholder="Auto" data-role="resize-height" />
+			</div>
+			<label class="kb-check-label">
+				<input type="checkbox" checked data-role="resize-aspect" />
+				<span>Keep aspect ratio</span>
+			</label>
+			<label class="kb-check-label">
+				<input type="checkbox" checked data-role="resize-no-upscale" />
+				<span>Never upscale</span>
+			</label>
+			<div class="kb-preset-pills" role="group" aria-label="Quick width presets">
+				<button type="button" class="kb-pill-btn" data-role="size-preset" data-width="1920">1920px</button>
+				<button type="button" class="kb-pill-btn" data-role="size-preset" data-width="1200">1200px</button>
+				<button type="button" class="kb-pill-btn" data-role="size-preset" data-width="800">800px</button>
+				<button type="button" class="kb-pill-btn" data-role="size-preset" data-scale="0.5" data-single-only="1" hidden>50%</button>
+				<button type="button" class="kb-pill-btn" data-role="size-preset" data-clear="1">Original size</button>
+			</div>
+		</div>
+
+		<div class="kb-notice-wrap" aria-live="polite" aria-atomic="true">
+			<div class="kb-notice" role="status" data-role="notice" hidden></div>
+		</div>
+
+		<div data-role="single-view">
+			<dl class="kb-lab-stats">
+				<div class="kb-lab-stat">
+					<dt data-role="orig-label">Original</dt>
+					<dd class="kb-lab-stat-value" data-role="orig-size">--</dd>
+					<dd class="kb-lab-stat-note" data-role="orig-dims">Waiting for image</dd>
+				</div>
+				<div class="kb-lab-stat">
+					<dt data-role="opt-label">Output (WebP)</dt>
+					<dd class="kb-lab-stat-value" data-role="opt-size">--</dd>
+					<dd class="kb-lab-stat-note" data-role="opt-meta">Local encoder ready</dd>
+				</div>
+				<div class="kb-lab-stat" data-role="savings-stat">
+					<dt>Measured change</dt>
+					<dd class="kb-lab-stat-value" data-role="savings-val">--</dd>
+					<dd class="kb-lab-stat-note" data-role="savings-note">Select an image to measure</dd>
+				</div>
+			</dl>
+
+			<div class="kb-compare-stage kb-checkerboard" data-role="compare-stage">
+				<img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" width="1" height="1" alt="Original image preview" class="kb-compare-img kb-compare-before" data-role="before-img" hidden />
+				<div class="kb-compare-after" data-role="after-wrap">
+					<img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" width="1" height="1" alt="Optimized image preview" class="kb-compare-img" data-role="after-img" hidden />
+				</div>
+				<span class="kb-compare-tag kb-compare-tag-left" data-role="left-tag" hidden>Original</span>
+				<span class="kb-compare-tag kb-compare-tag-right" data-role="right-tag" hidden>WebP</span>
+				<input type="range" min="0" max="100" value="50" class="kb-compare-range" data-role="split-range" aria-label="Slide to compare original and optimized image" disabled hidden />
+				<div class="kb-compare-divider" data-role="split-divider" aria-hidden="true" hidden>
+					<span class="kb-compare-handle">&harr;</span>
+				</div>
+				<div class="kb-compare-empty" data-role="empty-stage">
+					Loading sample photo locally...
+				</div>
+			</div>
+		</div>
+
+		<div class="kb-batch-wrap" data-role="batch-view" hidden>
+			<div class="kb-batch-summary" aria-live="polite">
+				<div>
+					<strong data-role="batch-headline">No images queued yet.</strong>
+					<p class="kb-small" data-role="batch-subline">Drop multiple files to process up to 3 concurrently in browser Web Workers.</p>
+				</div>
+				<div class="kb-lab-buttons">
+					<button type="button" class="kb-btn kb-btn-primary" data-role="zip-btn" disabled><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18 11.3l-1-1.1-4 4V3h-1.5v11.3L7 10.2l-1 1.1 6.2 5.8 5.8-5.8zm.5 3.7v3.5h-13V15H4v5h16v-5h-1.5z"/></svg><span>Download all (.zip)</span></button>
+				</div>
+			</div>
+			<ul class="kb-batch-list" data-role="batch-list"></ul>
+		</div>
+
+		<noscript>
+			<div class="kb-notice is-warning">
+				Enable JavaScript to run the local browser image encoder on this page. Your images are never uploaded to any server.
+			</div>
+		</noscript>
+	</div>
+
+	<div class="kb-card-footer">
+		<p class="kb-small" data-role="status-line" role="status" aria-live="polite">100% local browser processing. Your image files never leave your device.</p>
+		<button type="button" class="kb-btn kb-btn-secondary" data-role="download-placeholder" disabled><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18 11.3l-1-1.1-4 4V3h-1.5v11.3L7 10.2l-1 1.1 6.2 5.8 5.8-5.8zm.5 3.7v3.5h-13V15H4v5h16v-5h-1.5z"/></svg><span data-role="download-placeholder-label">Download WebP</span></button>
+		<a class="kb-btn kb-btn-secondary" data-role="download-btn" hidden><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18 11.3l-1-1.1-4 4V3h-1.5v11.3L7 10.2l-1 1.1 6.2 5.8 5.8-5.8zm.5 3.7v3.5h-13V15H4v5h16v-5h-1.5z"/></svg><span data-role="download-label">Download WebP</span></a>
+	</div>
+</div>
+<aside class="kb-wp-callout" data-role="wp-callout" aria-label="Kilobyte for WordPress">
+	<p><strong>Running a WordPress website?</strong> Kilobyte automatically optimizes your images as you upload them, keeping every original file and URL intact.</p>
+	<div class="kb-lab-buttons">
+		<a class="kb-btn kb-btn-primary" href="https://wordpress.org/plugins/kilobyte-image-optimizer/" target="_blank" rel="noopener noreferrer"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18 11.3l-1-1.1-4 4V3h-1.5v11.3L7 10.2l-1 1.1 6.2 5.8 5.8-5.8zm.5 3.7v3.5h-13V15H4v5h16v-5h-1.5z"/></svg><span>Get Kilobyte for WordPress</span></a>
+		<a class="kb-btn kb-btn-secondary" href="/"><span>Learn how it works</span></a>
+	</div>
+</aside>
+		</div>
+	</section>
+
+	<section class="kb-section kb-section-compact">
+		<div class="kb-container kb-guide-grid">
+			<div class="kb-guide-main">
+				<article class="kb-guide-block">
+					<h2>How to use Resize Image</h2>
+					<ol class="kb-steps-list">
+						<li>Drop an image or click Choose image to read its original pixel dimensions.</li>
+<li>Enter a target width, height, or click a quick preset (1920px, 1200px, 800px, or 50%).</li>
+<li>Keep aspect ratio locked to avoid distortion, pick your output format, and download the resized copy.</li>
+					</ol>
+				</article>
+
+				<article class="kb-guide-block">
+					<h2>Why resizing before upload is the biggest performance win</h2>
+					<p class="kb-body">A 4000 × 3000 smartphone photo contains 12 million pixels—more than 6 times the pixels needed for a 1600 px web container. Even at aggressive compression, shipping 6x too many pixels wastes bandwidth and slows browser image decoding on mobile devices.</p>
+<p class="kb-body">Kilobyte uses high-quality Canvas resampling (imageSmoothingQuality set to high) inside a Web Worker and enforces no-upscale protection by default so small images are never accidentally stretched blurry.</p>
+					<ul class="kb-bullets-list"><li>Blog featured images &amp; hero banners: 1600 px to 1920 px wide.</li><li>Content column photos: 1200 px wide (covers 2× Retina at 600 px CSS width).</li><li>Open Graph / social cards: 1200 × 630 px.</li></ul>
+				</article>
+<article class="kb-guide-block">
+					<h2>Preserving aspect ratio vs. exact dimensions</h2>
+					<p class="kb-body">With Keep aspect ratio enabled, entering either width or height calculates the matching dimension proportionally; entering both fits the image cleanly inside that bounding box without cropping or stretching. Uncheck Keep aspect ratio only when you intentionally want exact non-proportional dimensions.</p>
+
+				</article>
+
+				<article class="kb-guide-block">
+					<h2>Honest capabilities and browser limits</h2>
+					<ul class="kb-bullets-list">
+						<li>Input and output dimensions are bounded to 40 megapixels total and 16,384 px per side to protect browser memory.</li>
+<li>Animated GIFs, APNGs, and animated WebPs are not resized here because single-frame canvas scaling would lose animation.</li>
+					</ul>
+				</article>
+			</div>
+
+			<aside class="kb-guide-aside" aria-label="Resize Image specifications and related utilities">
+				<div class="kb-aside-card">
+					<h2>Tool specifications</h2>
+					<dl class="kb-spec-list">
+						<div>
+							<dt>Accepted inputs</dt>
+							<dd>JPEG, PNG, WebP, AVIF, still GIF, or BMP (up to 24 MB / 40 MP)</dd>
+						</div>
+						<div>
+							<dt>Output formats</dt>
+							<dd>WebP, JPEG, PNG, AVIF</dd>
+						</div>
+						<div>
+							<dt>Local encoder</dt>
+							<dd>High-quality Canvas resampling + WebP, JPEG, PNG, AVIF encoders</dd>
+						</div>
+						<div>
+							<dt>Privacy</dt>
+							<dd>100% in-browser; zero uploads, accounts, or quotas</dd>
+						</div>
+						<div>
+							<dt>Safety bounds</dt>
+							<dd>24 MB, 40 MP, 16,384 px/side; 150 MB ZIP</dd>
+						</div>
+					</dl>
+				</div>
+
+				<div class="kb-aside-card">
+					<h2>Related utilities</h2>
+					<ul class="kb-related-links">
+						<li><a href="/tools/compress-image/"><span>Compress Image</span><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13.5 6l-1.1 1.1 4.1 4.1H4v1.5h12.5l-4.1 4.1 1.1 1.1 6-6-6-6z"/></svg></a></li>
+<li><a href="/tools/bulk-image-compressor/"><span>Bulk Image Compressor</span><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13.5 6l-1.1 1.1 4.1 4.1H4v1.5h12.5l-4.1 4.1 1.1 1.1 6-6-6-6z"/></svg></a></li>
+<li><a href="/tools/compress-jpeg/"><span>Compress JPEG</span><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13.5 6l-1.1 1.1 4.1 4.1H4v1.5h12.5l-4.1 4.1 1.1 1.1 6-6-6-6z"/></svg></a></li>
+<li><a href="/tools/jpg-to-webp/"><span>JPG to WebP</span><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13.5 6l-1.1 1.1 4.1 4.1H4v1.5h12.5l-4.1 4.1 1.1 1.1 6-6-6-6z"/></svg></a></li>
+						<li><a href="/tools/"><span>View all 9 tools</span><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13.5 6l-1.1 1.1 4.1 4.1H4v1.5h12.5l-4.1 4.1 1.1 1.1 6-6-6-6z"/></svg></a></li>
+					</ul>
+				</div>
+			</aside>
+		</div>
+	</section>
+
+	<section class="kb-section kb-section-compact kb-section-wash">
+		<div class="kb-container kb-grid">
+			<div class="kb-faq-head">
+				<p class="kb-kicker">Questions</p>
+				<h2 class="kb-title">Resize Image FAQ</h2>
+			</div>
+			<div class="kb-faq-list">
+				<details class="kb-faq-item" open>
+					<summary>
+						<span class="kb-h3">Will resizing stretch or distort my photo?</span>
+						<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.5 11.6L12 16l-5.5-4.4.9-1.2L12 14l4.5-3.6 1 1.2z"/></svg>
+					</summary>
+					<p class="kb-body">Not with Keep aspect ratio checked (the default). Kilobyte computes proportional dimensions automatically so images stay sharp and undistorted.</p>
+				</details>
+<details class="kb-faq-item">
+					<summary>
+						<span class="kb-h3">What does &quot;Never upscale&quot; do?</span>
+						<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.5 11.6L12 16l-5.5-4.4.9-1.2L12 14l4.5-3.6 1 1.2z"/></svg>
+					</summary>
+					<p class="kb-body">If your source photo is 900 px wide and you request 1600 px, Kilobyte keeps it at 900 px rather than enlarging it into a blurry, heavier file. You can uncheck Never upscale if you explicitly need upscaling.</p>
+				</details>
+<details class="kb-faq-item">
+					<summary>
+						<span class="kb-h3">Can I resize and convert to WebP in one step?</span>
+						<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.5 11.6L12 16l-5.5-4.4.9-1.2L12 14l4.5-3.6 1 1.2z"/></svg>
+					</summary>
+					<p class="kb-body">Yes. Choose WebP, AVIF, JPEG, or PNG in the output format control and Kilobyte resizes and encodes in a single local pass.</p>
+				</details>
+			</div>
+		</div>
+	</section>
+</main>
+<footer class="kb-footer">
+	<div class="kb-container kb-footer-inner">
+		<div class="kb-footer-brand">
+			<img src="/assets/icon-128x128.png" alt="" width="24" height="24" />
+			<p class="kb-small">Kilobyte is free, open-source image optimization software under the GPL, version 2 or later. All browser utilities run 100% locally on your device.</p>
+		</div>
+		<nav class="kb-footer-links kb-small" aria-label="Footer navigation">
+			<a href="/">WordPress plugin</a>
+			<a href="/tools/">Browser tools</a>
+			<a href="https://wordpress.org/plugins/kilobyte-image-optimizer/" target="_blank" rel="noopener noreferrer">WordPress.org listing</a>
+			<a href="https://wordpress.org/support/plugin/kilobyte-image-optimizer/" target="_blank" rel="noopener noreferrer">Support forum</a>
+			<a href="https://github.com/JosephGabito/kilobyte-image-optimizer" target="_blank" rel="noopener noreferrer">Source code on GitHub</a>
+			<a href="/THIRD-PARTY-LICENSES.txt">Third-party licenses</a>
+			<a href="https://joseph.gabi.to" target="_blank" rel="noopener noreferrer">Made by Joseph Gabito</a>
+		</nav>
+	</div>
+</footer>
+	<script src="/dist/tool.8b1fbd1c.js" defer></script>
+</body>
+</html>
