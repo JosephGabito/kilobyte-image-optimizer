@@ -1,11 +1,13 @@
 {
 	"name": "kilobyte-image-optimizer",
-	"version": "1.0.1",
+	"version": "1.1.0",
 	"private": true,
 	"description": "WordPress native React admin UI and browser image compression for Kilobyte Image Optimizer.",
 	"scripts": {
 		"build": "wp-scripts build",
 		"start": "wp-scripts start",
+		"build:docs": "wp-scripts build --config webpack.docs.config.js",
+		"start:docs": "wp-scripts start --config webpack.docs.config.js",
 		"typecheck": "tsc --noEmit",
 		"lint:php": "composer run lint -- --no-cache",
 		"lint:php:fix": "composer run lint:fix",

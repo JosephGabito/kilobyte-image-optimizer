@@ -1,8 +1,8 @@
 <?php
 /**
  * Plugin Name:       Kilobyte Image Optimizer
- * Description:       Compress images to WebP or AVIF, keep original media links, and regenerate thumbnails.
- * Version:           1.0.1
+ * Description:       Unlimited free WebP and AVIF image optimization that keeps original files and links intact, with WordPress Abilities for AI agents.
+ * Version:           1.1.0
  * Requires at least: 6.6
  * Requires PHP:      7.4
  * Author:            Joseph Gabito
@@ -20,7 +20,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'KILOBYTE_IO_VERSION', '1.0.1' );
+define( 'KILOBYTE_IO_VERSION', '1.1.0' );
 define( 'KILOBYTE_IO_FILE', __FILE__ );
 define( 'KILOBYTE_IO_DIR', plugin_dir_path( __FILE__ ) );
 define( 'KILOBYTE_IO_URL', plugin_dir_url( __FILE__ ) );
@@ -59,6 +59,7 @@ use Kilobyte\ImageOptimizer\Infrastructure\WordPress\WpOptimizationEvents;
 use Kilobyte\ImageOptimizer\Infrastructure\WordPress\WpRemovedVariantQueue;
 use Kilobyte\ImageOptimizer\Infrastructure\WordPress\WpSiteScope;
 use Kilobyte\ImageOptimizer\Infrastructure\WordPress\WpVariantRetirement;
+use Kilobyte\ImageOptimizer\Presentation\Abilities\OptimizerAbilities;
 use Kilobyte\ImageOptimizer\Presentation\Admin\OptimizerAdminPage;
 use Kilobyte\ImageOptimizer\Presentation\Cli\OptimizerCliCommand;
 use Kilobyte\ImageOptimizer\Presentation\Hooks\AutomaticUploadOptimization;
@@ -140,6 +141,13 @@ function kilobyte_io_bootstrap(): void {
 		$restore,
 		$purge_backups
 	);
+	$abilities         = new OptimizerAbilities(
+		$attachment_repo,
+		$settings_repo,
+		$optimize_server,
+		$restore,
+		$regenerate
+	);
 
 	$rest_controller->register();
 	$media_hooks->register();
@@ -151,6 +159,7 @@ function kilobyte_io_bootstrap(): void {
 	add_action( 'admin_init', array( WpVariantRetirement::class, 'resume_if_needed' ), 10, 0 );
 	$admin_page->register();
 	$cli_command->register();
+	$abilities->register();
 }
 add_action( 'plugins_loaded', 'kilobyte_io_bootstrap' );
 
