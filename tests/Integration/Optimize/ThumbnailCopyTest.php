@@ -80,11 +80,12 @@ final class ThumbnailCopyTest extends OptimizeTestCase {
 	}
 
 	public function test_a_gif_thumbnail_whose_frame_does_not_fill_it_gets_no_copy(): void {
+		$this->use_settings( array( 'skip_smaller' => false ) );
 		$id     = $this->upload( Images::still_gif( 320, 240 ) );
 		$folder = dirname( (string) get_attached_file( $id ) );
 		$this->replace_file( $folder . '/still-150x150.gif', $this->gif_with_partial_frame() );
 
-		$this->assertRestOk( $this->send_browser_copy( $id, Images::webp( 320, 240 ) ) );
+		$this->assertRestOk( $this->send_browser_copy( $id, Images::webp( 64, 48 ) ) );
 
 		$this->assertSame( array(), preg_grep( '/^still-150x150\.kilobyte-/', $this->copies_next_to( $id ) ) );
 		$this->assertNotEmpty( preg_grep( '/^still-300x225\.kilobyte-/', $this->copies_next_to( $id ) ) );

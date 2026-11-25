@@ -128,6 +128,7 @@ final class ServerEncodeTest extends OptimizeTestCase {
 
 	public function test_a_bmp_cannot_be_encoded_on_a_server_whose_editor_cannot_read_bmp(): void {
 		$id = $this->upload( $this->bmp() );
+		add_filter( 'wp_image_editors', static fn (): array => array( 'WP_Image_Editor_GD' ) );
 
 		$this->assertRestFailure( 'encode_failed', 422, $this->optimize_on_server( $id ) );
 		$this->assertSame( array(), $this->copies_next_to( $id ) );

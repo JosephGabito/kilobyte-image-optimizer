@@ -72,7 +72,7 @@ final class BrowserCopyTest extends OptimizeTestCase {
 		$this->use_settings( array( 'format' => 'original' ) );
 		$id = $this->upload( Images::still_gif( 320, 240 ) );
 
-		$result = $this->assertRestOk( $this->send_browser_copy( $id, Images::webp( 320, 240 ), null, array( 'preview' => '1' ) ) );
+		$result = $this->assertRestOk( $this->send_browser_copy( $id, Images::webp( 64, 48 ), null, array( 'preview' => '1' ) ) );
 
 		$this->assertFalse( $result['skipped'] );
 		$this->assertSame( 'webp', $result['format'] );

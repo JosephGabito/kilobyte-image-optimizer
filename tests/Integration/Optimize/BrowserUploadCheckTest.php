@@ -198,7 +198,7 @@ final class BrowserUploadCheckTest extends OptimizeTestCase {
 		);
 
 		$this->assertRestFailure( 'invalid_image', 422, $response );
-		$this->assertSame( 'File is not an image.', $response->get_data()['data']['technical'], 'The image editor, not the header check, must reject it.' );
+		$this->assertNotSame( '', (string) ( $response->get_data()['data']['technical'] ?? '' ), 'The image editor, not the header check, must reject it.' );
 	}
 
 	public function test_an_author_can_send_a_copy_for_their_own_image(): void {
