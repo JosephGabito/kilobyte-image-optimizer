@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<meta name="referrer" content="strict-origin-when-cross-origin" />
+	<meta http-equiv="Content-Security-Policy" content="default-src &#39;self&#39;; script-src &#39;self&#39; &#39;wasm-unsafe-eval&#39;; style-src &#39;self&#39;; img-src &#39;self&#39; blob: data:; font-src &#39;self&#39;; connect-src &#39;self&#39; blob:; worker-src &#39;self&#39;; object-src &#39;none&#39;; base-uri &#39;self&#39;" />
+	<title>JPG to AVIF Converter — Free Browser Tool | Kilobyte</title>
+	<meta name="description" content="Convert JPG and JPEG photos to AVIF locally in your browser. Native encoding with lazy-loaded WebAssembly libaom fallback for Safari and Firefox." />
+	<link rel="canonical" href="https://kilobyte.gabi.to/tools/jpg-to-avif/" />
+
+	<meta property="og:type" content="website" />
+	<meta property="og:site_name" content="Kilobyte" />
+	<meta property="og:url" content="https://kilobyte.gabi.to/tools/jpg-to-avif/" />
+	<meta property="og:title" content="JPG to AVIF Converter — Free Browser Tool | Kilobyte" />
+	<meta property="og:description" content="Convert JPG and JPEG photos to AVIF locally in your browser. Native encoding with lazy-loaded WebAssembly libaom fallback for Safari and Firefox." />
+	<meta property="og:image" content="https://kilobyte.gabi.to/assets/og-card-1200x630.jpg" />
+	<meta property="og:image:width" content="1200" />
+	<meta property="og:image:height" content="630" />
+	<meta property="og:image:alt" content="Kilobyte — Free browser-powered WebP, AVIF, JPEG, and PNG image optimization tools and WordPress plugin." />
+	<meta name="twitter:card" content="summary_large_image" />
+	<meta name="twitter:title" content="JPG to AVIF Converter — Free Browser Tool | Kilobyte" />
+	<meta name="twitter:description" content="Convert JPG and JPEG photos to AVIF locally in your browser. Native encoding with lazy-loaded WebAssembly libaom fallback for Safari and Firefox." />
+	<meta name="twitter:image" content="https://kilobyte.gabi.to/assets/og-card-1200x630.jpg" />
+	<meta name="twitter:image:alt" content="Kilobyte — Free browser-powered WebP, AVIF, JPEG, and PNG image optimization tools and WordPress plugin." />
+
+	<link rel="icon" type="image/png" href="/assets/icon-128x128.png" />
+	<link rel="preload" as="font" href="/assets/fonts/eb-garamond-latin-wght-normal.woff2" type="font/woff2" crossorigin />
+	<link rel="preload" as="font" href="/assets/fonts/inter-latin-wght-normal.woff2" type="font/woff2" crossorigin />
+	<link rel="stylesheet" href="/dist/site.f3bf5b37.css" />
+	<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","@id":"https://kilobyte.gabi.to/tools/jpg-to-avif/#app","name":"Kilobyte JPG to AVIF","url":"https://kilobyte.gabi.to/tools/jpg-to-avif/","description":"Convert JPG and JPEG photos to AVIF locally in your browser. Native encoding with lazy-loaded WebAssembly libaom fallback for Safari and Firefox.","applicationCategory":"MultimediaApplication","operatingSystem":"Any (Web Browser)","browserRequirements":"Requires JavaScript and HTML5 Canvas / WebAssembly support.","image":"https://kilobyte.gabi.to/assets/og-card-1200x630.jpg","license":"https://www.gnu.org/licenses/gpl-2.0.html","author":{"@type":"Person","@id":"https://kilobyte.gabi.to/#author","name":"Joseph Gabito","url":"https://joseph.gabi.to"},"isPartOf":{"@id":"https://kilobyte.gabi.to/#website"},"featureList":["100% local in-browser processing with zero file uploads","Output formats: AVIF","Encoder: Native AVIF encoder + lazy self-hosted libaom AVIF WASM","Real measured byte deltas and output signature verification"],"isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}}</script>
+	<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Kilobyte","item":"https://kilobyte.gabi.to/"},{"@type":"ListItem","position":2,"name":"Tools","item":"https://kilobyte.gabi.to/tools/"},{"@type":"ListItem","position":3,"name":"JPG to AVIF","item":"https://kilobyte.gabi.to/tools/jpg-to-avif/"}]}</script>
+	<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Does JPG to AVIF work on Safari and Firefox?","acceptedAnswer":{"@type":"Answer","text":"Yes. Even when a browser cannot encode AVIF natively through Canvas, Kilobyte lazy-loads a self-hosted libaom WebAssembly encoder inside a Web Worker and verifies the AVIF container header."}},{"@type":"Question","name":"Why does AVIF take longer to encode than WebP?","acceptedAnswer":{"@type":"Answer","text":"AV1 intra-frame compression evaluates far more block partitions and prediction modes than WebP or JPEG. That extra computation during encoding is what produces smaller files for visitors to download."}},{"@type":"Question","name":"Should I use AVIF or WebP on my WordPress site?","acceptedAnswer":{"@type":"Answer","text":"AVIF gives the smallest files for hero photos and image-heavy pages, while WebP encodes much faster for large bulk runs. Kilobyte for WordPress supports both and serves them safely through \u003cpicture\u003e tags with original fallbacks."}}]}</script>
+</head>
+<body>
+<a class="kb-skip-link" href="#main-content">Skip to main content</a>
+<header class="kb-topbar">
+	<div class="kb-container kb-topbar-inner">
+		<div class="kb-topbar-left">
+			<a class="kb-brand" href="/" aria-label="Kilobyte home">Kilobyte</a>
+			<nav class="kb-nav" aria-label="Primary navigation">
+			<a href="/tools/">All tools</a>
+			<a href="/tools/compress-image/">Compress</a>
+			<a href="/tools/#cat-convert">Convert</a>
+			<a href="/tools/resize-image/">Resize</a>
+			<a href="/tools/bulk-image-compressor/">Bulk</a>
+			<a href="/">WordPress plugin</a>
+			</nav>
+		</div>
+		<div class="kb-topbar-actions">
+			<a class="kb-topbar-link kb-topbar-github" href="https://github.com/JosephGabito/kilobyte-image-optimizer" target="_blank" rel="noopener noreferrer">GitHub</a>
+			<a class="kb-btn kb-btn-primary kb-topbar-cta" href="https://wordpress.org/plugins/kilobyte-image-optimizer/" target="_blank" rel="noopener noreferrer">Get WP plugin</a>
+			<details class="kb-mobile-nav">
+				<summary class="kb-mobile-nav-trigger" aria-label="Toggle navigation menu"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M4 7.5h16V6H4v1.5zm0 5.25h16v-1.5H4v1.5zM4 18h16v-1.5H4V18z"/></svg><span>Menu</span></summary>
+				<nav class="kb-mobile-nav-panel" aria-label="Mobile navigation">
+				<a href="/tools/">All tools</a>
+				<a href="/tools/compress-image/">Compress</a>
+				<a href="/tools/#cat-convert">Convert</a>
+				<a href="/tools/resize-image/">Resize</a>
+				<a href="/tools/bulk-image-compressor/">Bulk</a>
+				<a href="/">WordPress plugin</a>
+					<a href="https://github.com/JosephGabito/kilobyte-image-optimizer" target="_blank" rel="noopener noreferrer">GitHub</a>
+				</nav>
+			</details>
+		</div>
+	</div>
+</header>
+<main id="main-content">
+	<section class="kb-tool-hero">
+		<div class="kb-container">
+			<nav class="kb-breadcrumbs" aria-label="Breadcrumb">
+				<a href="/">Kilobyte</a>
+				<span aria-hidden="true">/</span>
+				<a href="/tools/">Tools</a>
+				<span aria-hidden="true">/</span>
+				<span aria-current="page">JPG to AVIF</span>
+			</nav>
+
+			<div class="kb-tool-hero-head">
+				<h1>Convert JPG to AVIF locally in your browser.</h1>
+				<p class="kb-lead">Get next-generation AV1 image compression from your JPEG photos with zero server uploads. Runs natively where supported and falls back automatically to self-hosted AVIF WebAssembly in Safari and Firefox.</p>
+			</div>
+
+			<div class="kb-card kb-lab-card" id="kb-tool-jpg-to-avif" data-tool-widget>
+	<script type="application/json" data-role="tool-config">{"slug":"jpg-to-avif","accept":"image/jpeg,.jpg,.jpeg","defaultOutputMime":"image/avif","allowedOutputMimes":["image/avif"],"defaultQuality":82,"defaultPngMode":"lossy","showResize":false,"batchFocused":false,"sampleUrl":"/assets/sample-photo.jpg","autoLoadSample":false,"workerUrl":"/dist/tool-worker.f2425cdf.js"}</script>
+
+	<div class="kb-card-header">
+		<h2 class="kb-h3">JPG to AVIF</h2>
+		<div class="kb-lab-buttons">
+			<button type="button" class="kb-btn kb-btn-primary" data-role="pick-btn"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18.5 15v3.5H13V6.7l4.5 4.1 1-1.1-6.2-5.8-5.8 5.8 1 1.1 4-4v11.7h-6V15H4v5h16v-5h-1.5z"/></svg><span>Choose image</span></button>
+			<input type="file" class="sr-only" tabindex="-1" aria-hidden="true" accept="image/jpeg,.jpg,.jpeg" multiple data-role="file-input" />
+			<button type="button" class="kb-btn kb-btn-ghost" data-role="sample-btn"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 5V2L8 6l4 4V7c3.3 0 6 2.7 6 6s-2.7 6-6 6-6-2.7-6-6H4c0 4.4 3.6 8 8 8s8-3.6 8-8-3.6-8-8-8z"/></svg><span>Use sample photo</span></button>
+			<button type="button" class="kb-btn kb-btn-danger" data-role="cancel-btn" hidden>Cancel</button>
+			<button type="button" class="kb-btn kb-btn-ghost" data-role="clear-btn" hidden>Clear</button>
+		</div>
+	</div>
+
+	<div class="kb-card-body kb-lab-body">
+		<div class="kb-dropzone" data-role="dropzone" role="button" tabindex="0">
+			<p class="kb-dropzone-title">Drop one or more images here, or click to browse</p>
+			<p class="kb-small">Accepts JPG or JPEG images (up to 24 MB / 40 MP). Processed 100% locally in your browser.</p>
+		</div>
+
+		<div class="kb-lab-controls">
+			<div class="kb-control-group">
+			<span class="kb-control-label">Output format</span>
+			<div class="kb-format-fixed">AVIF</div>
+		</div>
+			<div class="kb-control-group" data-role="preset-group">
+			<span class="kb-control-label">Compression preset</span>
+			<div class="kb-seg" role="group" aria-label="Compression preset">
+				<button type="button" class="kb-seg-btn" data-role="preset-btn" data-quality="90" aria-pressed="false">High</button>
+				<button type="button" class="kb-seg-btn is-active" data-role="preset-btn" data-quality="82" aria-pressed="true">Balanced</button>
+				<button type="button" class="kb-seg-btn" data-role="preset-btn" data-quality="72" aria-pressed="false">Smallest</button>
+			</div>
+		</div>
+			<div class="kb-control-group" data-role="quality-group">
+			<label class="kb-control-label" for="kb-tool-jpg-to-avif-quality">
+				<span>Quality</span>
+				<span class="kb-control-val" data-role="quality-val">82</span>
+			</label>
+			<input id="kb-tool-jpg-to-avif-quality" class="kb-range" type="range" min="40" max="95" value="82" data-role="quality-input" />
+		</div>
+
+		</div>
+
+
+
+		<div class="kb-notice-wrap" aria-live="polite" aria-atomic="true">
+			<div class="kb-notice" role="status" data-role="notice" hidden></div>
+		</div>
+
+		<div data-role="single-view">
+			<dl class="kb-lab-stats">
+				<div class="kb-lab-stat">
+					<dt data-role="orig-label">Original</dt>
+					<dd class="kb-lab-stat-value" data-role="orig-size">--</dd>
+					<dd class="kb-lab-stat-note" data-role="orig-dims">Waiting for image</dd>
+				</div>
+				<div class="kb-lab-stat">
+					<dt data-role="opt-label">Output (AVIF)</dt>
+					<dd class="kb-lab-stat-value" data-role="opt-size">--</dd>
+					<dd class="kb-lab-stat-note" data-role="opt-meta">Local encoder ready</dd>
+				</div>
+				<div class="kb-lab-stat" data-role="savings-stat">
+					<dt>Measured change</dt>
+					<dd class="kb-lab-stat-value" data-role="savings-val">--</dd>
+					<dd class="kb-lab-stat-note" data-role="savings-note">Select an image to measure</dd>
+				</div>
+			</dl>
+
+			<div class="kb-compare-stage" data-role="compare-stage">
+				<img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" width="1" height="1" alt="Original image preview" class="kb-compare-img kb-compare-before" data-role="before-img" hidden />
+				<div class="kb-compare-after" data-role="after-wrap">
+					<img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" width="1" height="1" alt="Optimized image preview" class="kb-compare-img" data-role="after-img" hidden />
+				</div>
+				<span class="kb-compare-tag kb-compare-tag-left" data-role="left-tag" hidden>Original</span>
+				<span class="kb-compare-tag kb-compare-tag-right" data-role="right-tag" hidden>AVIF</span>
+				<input type="range" min="0" max="100" value="50" class="kb-compare-range" data-role="split-range" aria-label="Slide to compare original and optimized image" disabled hidden />
+				<div class="kb-compare-divider" data-role="split-divider" aria-hidden="true" hidden>
+					<span class="kb-compare-handle">&harr;</span>
+				</div>
+				<div class="kb-compare-empty" data-role="empty-stage">
+					Drop or choose an image above to preview before and after locally.
+				</div>
+			</div>
+		</div>
+
+		<div class="kb-batch-wrap" data-role="batch-view" hidden>
+			<div class="kb-batch-summary" aria-live="polite">
+				<div>
+					<strong data-role="batch-headline">No images queued yet.</strong>
+					<p class="kb-small" data-role="batch-subline">Drop multiple files to process up to 3 concurrently in browser Web Workers.</p>
+				</div>
+				<div class="kb-lab-buttons">
+					<button type="button" class="kb-btn kb-btn-primary" data-role="zip-btn" disabled><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18 11.3l-1-1.1-4 4V3h-1.5v11.3L7 10.2l-1 1.1 6.2 5.8 5.8-5.8zm.5 3.7v3.5h-13V15H4v5h16v-5h-1.5z"/></svg><span>Download all (.zip)</span></button>
+				</div>
+			</div>
+			<ul class="kb-batch-list" data-role="batch-list"></ul>
+		</div>
+
+		<noscript>
+			<div class="kb-notice is-warning">
+				Enable JavaScript to run the local browser image encoder on this page. Your images are never uploaded to any server.
+			</div>
+		</noscript>
+	</div>
+
+	<div class="kb-card-footer">
+		<p class="kb-small" data-role="status-line" role="status" aria-live="polite">100% local browser processing. Your image files never leave your device.</p>
+		<button type="button" class="kb-btn kb-btn-secondary" data-role="download-placeholder" disabled><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18 11.3l-1-1.1-4 4V3h-1.5v11.3L7 10.2l-1 1.1 6.2 5.8 5.8-5.8zm.5 3.7v3.5h-13V15H4v5h16v-5h-1.5z"/></svg><span data-role="download-placeholder-label">Download AVIF</span></button>
+		<a class="kb-btn kb-btn-secondary" data-role="download-btn" hidden><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18 11.3l-1-1.1-4 4V3h-1.5v11.3L7 10.2l-1 1.1 6.2 5.8 5.8-5.8zm.5 3.7v3.5h-13V15H4v5h16v-5h-1.5z"/></svg><span data-role="download-label">Download AVIF</span></a>
+	</div>
+</div>
+<aside class="kb-wp-callout" data-role="wp-callout" aria-label="Kilobyte for WordPress">
+	<p><strong>Running a WordPress website?</strong> Kilobyte automatically optimizes your images as you upload them, keeping every original file and URL intact.</p>
+	<div class="kb-lab-buttons">
+		<a class="kb-btn kb-btn-primary" href="https://wordpress.org/plugins/kilobyte-image-optimizer/" target="_blank" rel="noopener noreferrer"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18 11.3l-1-1.1-4 4V3h-1.5v11.3L7 10.2l-1 1.1 6.2 5.8 5.8-5.8zm.5 3.7v3.5h-13V15H4v5h16v-5h-1.5z"/></svg><span>Get Kilobyte for WordPress</span></a>
+		<a class="kb-btn kb-btn-secondary" href="/"><span>Learn how it works</span></a>
+	</div>
+</aside>
+		</div>
+	</section>
+
+	<section class="kb-section kb-section-compact">
+		<div class="kb-container kb-guide-grid">
+			<div class="kb-guide-main">
+				<article class="kb-guide-block">
+					<h2>How to use JPG to AVIF</h2>
+					<ol class="kb-steps-list">
+						<li>Drop a JPG or JPEG image onto the converter, or click Use sample photo to test on a built-in photograph.</li>
+<li>Pick a quality level (Balanced 82 is tuned for strong perceptual detail with compact AVIF bitstreams).</li>
+<li>Wait for the local encoder to finish (native or WebAssembly), inspect the result, and click Download AVIF.</li>
+					</ol>
+				</article>
+
+				<article class="kb-guide-block">
+					<h2>When AVIF beats WebP and JPEG</h2>
+					<p class="kb-body">AVIF is derived from the AV1 video codec and typically compresses photographs 20% to 40% smaller than WebP and 50%+ smaller than original JPEGs at comparable visual quality, especially on smooth skies, gradients, and high-resolution hero images.</p>
+<p class="kb-body">Chrome, Safari, Firefox, and Edge all decode AVIF natively. When serving AVIF on production sites, pairing it with a &lt;picture&gt; fallback ensures older crawlers and legacy tools still receive a valid image.</p>
+
+				</article>
+<article class="kb-guide-block">
+					<h2>Honest note on encoding speed and browser support</h2>
+					<p class="kb-body">AVIF compression does substantially more mathematical work than JPEG or WebP. On browsers that support native AVIF Canvas encoding, Kilobyte uses the native encoder for speed. On browsers that do not, Kilobyte lazy-loads a self-hosted libaom WebAssembly encoder inside a background Web Worker only when you start an encode—large photos can take a second or two in WebAssembly.</p>
+
+				</article>
+
+				<article class="kb-guide-block">
+					<h2>Honest capabilities and browser limits</h2>
+					<ul class="kb-bullets-list">
+						<li>AVIF encoding is slower than WebP, particularly when running through the single-threaded WebAssembly fallback on large high-resolution photos.</li>
+<li>When the WASM fallback is needed, the browser downloads a ~3.3 MB (roughly 1 MB compressed) self-hosted avif_enc.wasm codec on first encode and caches it locally; your images are never uploaded.</li>
+<li>Every output is verified against the ISO BMFF ftyp/avif container signature before download is enabled.</li>
+					</ul>
+				</article>
+			</div>
+
+			<aside class="kb-guide-aside" aria-label="JPG to AVIF specifications and related utilities">
+				<div class="kb-aside-card">
+					<h2>Tool specifications</h2>
+					<dl class="kb-spec-list">
+						<div>
+							<dt>Accepted inputs</dt>
+							<dd>JPG or JPEG images (up to 24 MB / 40 MP)</dd>
+						</div>
+						<div>
+							<dt>Output format</dt>
+							<dd>AVIF</dd>
+						</div>
+						<div>
+							<dt>Local encoder</dt>
+							<dd>Native AVIF encoder + lazy self-hosted libaom AVIF WASM</dd>
+						</div>
+						<div>
+							<dt>Privacy</dt>
+							<dd>100% in-browser; zero uploads, accounts, or quotas</dd>
+						</div>
+						<div>
+							<dt>Safety bounds</dt>
+							<dd>24 MB, 40 MP, 16,384 px/side; 150 MB ZIP</dd>
+						</div>
+					</dl>
+				</div>
+
+				<div class="kb-aside-card">
+					<h2>Related utilities</h2>
+					<ul class="kb-related-links">
+						<li><a href="/tools/png-to-avif/"><span>PNG to AVIF</span><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13.5 6l-1.1 1.1 4.1 4.1H4v1.5h12.5l-4.1 4.1 1.1 1.1 6-6-6-6z"/></svg></a></li>
+<li><a href="/tools/jpg-to-webp/"><span>JPG to WebP</span><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13.5 6l-1.1 1.1 4.1 4.1H4v1.5h12.5l-4.1 4.1 1.1 1.1 6-6-6-6z"/></svg></a></li>
+<li><a href="/tools/compress-jpeg/"><span>Compress JPEG</span><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13.5 6l-1.1 1.1 4.1 4.1H4v1.5h12.5l-4.1 4.1 1.1 1.1 6-6-6-6z"/></svg></a></li>
+<li><a href="/tools/bulk-image-compressor/"><span>Bulk Image Compressor</span><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13.5 6l-1.1 1.1 4.1 4.1H4v1.5h12.5l-4.1 4.1 1.1 1.1 6-6-6-6z"/></svg></a></li>
+						<li><a href="/tools/"><span>View all 9 tools</span><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13.5 6l-1.1 1.1 4.1 4.1H4v1.5h12.5l-4.1 4.1 1.1 1.1 6-6-6-6z"/></svg></a></li>
+					</ul>
+				</div>
+			</aside>
+		</div>
+	</section>
+
+	<section class="kb-section kb-section-compact kb-section-wash">
+		<div class="kb-container kb-grid">
+			<div class="kb-faq-head">
+				<p class="kb-kicker">Questions</p>
+				<h2 class="kb-title">JPG to AVIF FAQ</h2>
+			</div>
+			<div class="kb-faq-list">
+				<details class="kb-faq-item" open>
+					<summary>
+						<span class="kb-h3">Does JPG to AVIF work on Safari and Firefox?</span>
+						<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.5 11.6L12 16l-5.5-4.4.9-1.2L12 14l4.5-3.6 1 1.2z"/></svg>
+					</summary>
+					<p class="kb-body">Yes. Even when a browser cannot encode AVIF natively through Canvas, Kilobyte lazy-loads a self-hosted libaom WebAssembly encoder inside a Web Worker and verifies the AVIF container header.</p>
+				</details>
+<details class="kb-faq-item">
+					<summary>
+						<span class="kb-h3">Why does AVIF take longer to encode than WebP?</span>
+						<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.5 11.6L12 16l-5.5-4.4.9-1.2L12 14l4.5-3.6 1 1.2z"/></svg>
+					</summary>
+					<p class="kb-body">AV1 intra-frame compression evaluates far more block partitions and prediction modes than WebP or JPEG. That extra computation during encoding is what produces smaller files for visitors to download.</p>
+				</details>
+<details class="kb-faq-item">
+					<summary>
+						<span class="kb-h3">Should I use AVIF or WebP on my WordPress site?</span>
+						<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.5 11.6L12 16l-5.5-4.4.9-1.2L12 14l4.5-3.6 1 1.2z"/></svg>
+					</summary>
+					<p class="kb-body">AVIF gives the smallest files for hero photos and image-heavy pages, while WebP encodes much faster for large bulk runs. Kilobyte for WordPress supports both and serves them safely through &lt;picture&gt; tags with original fallbacks.</p>
+				</details>
+			</div>
+		</div>
+	</section>
+</main>
+<footer class="kb-footer">
+	<div class="kb-container kb-footer-inner">
+		<div class="kb-footer-brand">
+			<img src="/assets/icon-128x128.png" alt="" width="24" height="24" />
+			<p class="kb-small">Kilobyte is free, open-source image optimization software under the GPL, version 2 or later. All browser utilities run 100% locally on your device.</p>
+		</div>
+		<nav class="kb-footer-links kb-small" aria-label="Footer navigation">
+			<a href="/">WordPress plugin</a>
+			<a href="/tools/">Browser tools</a>
+			<a href="https://wordpress.org/plugins/kilobyte-image-optimizer/" target="_blank" rel="noopener noreferrer">WordPress.org listing</a>
+			<a href="https://wordpress.org/support/plugin/kilobyte-image-optimizer/" target="_blank" rel="noopener noreferrer">Support forum</a>
+			<a href="https://github.com/JosephGabito/kilobyte-image-optimizer" target="_blank" rel="noopener noreferrer">Source code on GitHub</a>
+			<a href="/THIRD-PARTY-LICENSES.txt">Third-party licenses</a>
+			<a href="https://joseph.gabi.to" target="_blank" rel="noopener noreferrer">Made by Joseph Gabito</a>
+		</nav>
+	</div>
+</footer>
+	<script src="/dist/tool.b00761b9.js" defer></script>
+</body>
+</html>

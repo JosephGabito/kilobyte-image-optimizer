@@ -1,0 +1,33 @@
+# Kilobyte Image Optimizer
+
+> Free, open-source (GPL-2.0+) browser-powered image optimization tools and WordPress plugin. Zero image uploads, no accounts, no quotas, and verified output file signatures.
+
+## Overview
+- Website: https://kilobyte.gabi.to/
+- WordPress.org Plugin: https://wordpress.org/plugins/kilobyte-image-optimizer/
+- Source Code: https://github.com/JosephGabito/kilobyte-image-optimizer
+- Version: 1.1.0 (WordPress 6.6+, PHP 7.4+, GD or Imagick)
+
+## Privacy & Architecture
+- Standalone web tools run 100% locally in browser Web Workers using native Canvas encoders plus lazy-loaded, self-hosted single-threaded WebAssembly codecs (UPNG, OxiPNG, libwebp, libaom AVIF).
+- Enforced zero-upload policy: no image bytes leave the user's device.
+- Resource safety caps: 24 MB, 40 megapixels, 16,384 px per side per image; 150 MiB per client-side ZIP archive.
+- Animated GIFs, APNGs, and animated WebP/AVIF files are skipped rather than flattened.
+
+## Standalone Browser Tools
+- [Tools Directory](https://kilobyte.gabi.to/tools/): Overview of all 9 local browser utilities.
+- [Compress Image](https://kilobyte.gabi.to/tools/compress-image/): Optimize JPEG, PNG, WebP, AVIF, GIF, or BMP locally with live before/after inspection.
+- [Compress JPEG](https://kilobyte.gabi.to/tools/compress-jpeg/): Optimize JPG and JPEG photographs with live quality control and side-by-side detail check.
+- [Compress PNG](https://kilobyte.gabi.to/tools/compress-png/): Shrink PNG screenshots, logos, and transparent graphics via palette quantization or lossless OxiPNG.
+- [JPG to WebP](https://kilobyte.gabi.to/tools/jpg-to-webp/): Convert JPEG photographs into lightweight WebP copies with real measured savings.
+- [PNG to WebP](https://kilobyte.gabi.to/tools/png-to-webp/): Convert transparent PNGs and UI screenshots to WebP while preserving crisp alpha edges.
+- [JPG to AVIF](https://kilobyte.gabi.to/tools/jpg-to-avif/): Convert JPEG photos to compact AVIF files with native speed and WASM fallback.
+- [PNG to AVIF](https://kilobyte.gabi.to/tools/png-to-avif/): Convert transparent PNG graphics and screenshots into ultra-compact AVIF files.
+- [Resize Image](https://kilobyte.gabi.to/tools/resize-image/): Resize photos to exact width/height or common web sizes with aspect-ratio lock and high-quality scaling.
+- [Bulk Image Compressor](https://kilobyte.gabi.to/tools/bulk-image-compressor/): Batch compress and convert dozens of photos in parallel with live totals and ZIP export.
+
+## WordPress Plugin Automation
+- Non-destructive: keeps original Media Library files and URLs untouched, serving WebP/AVIF copies safely via <picture> fallbacks.
+- WordPress Abilities API (WP 6.9+): `kilobyte/get-stats`, `kilobyte/get-queue`, `kilobyte/optimize-image`, `kilobyte/restore-image`, `kilobyte/regenerate-thumbnails`, `kilobyte/get-settings`, `kilobyte/update-settings`.
+- WP-CLI: `wp kilobyte stats`, `wp kilobyte optimize`, `wp kilobyte restore`, `wp kilobyte purge-backups`.
+- PHP Hooks: `kilobyte_io_settings`, `kilobyte_io_should_optimize`, `kilobyte_io_variant_changed`.

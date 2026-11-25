@@ -1,17 +1,7 @@
+import { formatBytes, isSupportedMime, swapExtension } from '../core/format';
 import type { BrowserSupport, OutputFormat } from './types';
 
-const SUPPORTED_INPUT_MIMES = new Set< string >( [
-	'image/jpeg',
-	'image/png',
-	'image/webp',
-	'image/avif',
-	'image/bmp',
-	'image/gif',
-] );
-
-export function isSupportedMime( mime: string ): boolean {
-	return SUPPORTED_INPUT_MIMES.has( mime );
-}
+export { formatBytes, isSupportedMime, swapExtension };
 
 export function resolveTargetMime(
 	requestedFormat: OutputFormat,
@@ -50,23 +40,4 @@ export function needsServerFallback(
 		return true;
 	}
 	return false;
-}
-
-export function swapExtension( filename: string, newExt: string ): string {
-	const clean = ( filename || 'image' ).replace( /\.[^.]+$/, '' );
-	return `${ clean }.${ newExt }`;
-}
-
-export function formatBytes( bytes: number ): string {
-	const n = Number( bytes || 0 );
-	if ( n < 1024 ) {
-		return `${ n } B`;
-	}
-	if ( n < 1024 * 1024 ) {
-		return `${ ( n / 1024 ).toFixed( 1 ) } KB`;
-	}
-	if ( n < 1024 * 1024 * 1024 ) {
-		return `${ ( n / ( 1024 * 1024 ) ).toFixed( 2 ) } MB`;
-	}
-	return `${ ( n / ( 1024 * 1024 * 1024 ) ).toFixed( 2 ) } GB`;
 }

@@ -3,45 +3,599 @@
 <head>
 	<meta charset="UTF-8" />
 	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-	<title>Kilobyte Image Optimizer | Free WebP and AVIF image optimization for WordPress</title>
-	<meta name="description" content="Kilobyte makes smaller WebP and AVIF copies of your WordPress images. Your original Media Library files and existing links stay untouched, and you can test one photo before you optimize the rest." />
-
+	<meta name="referrer" content="strict-origin-when-cross-origin" />
+	<meta http-equiv="Content-Security-Policy" content="default-src &#39;self&#39;; script-src &#39;self&#39; &#39;wasm-unsafe-eval&#39;; style-src &#39;self&#39;; img-src &#39;self&#39; blob: data:; font-src &#39;self&#39;; connect-src &#39;self&#39; blob:; worker-src &#39;self&#39;; object-src &#39;none&#39;; base-uri &#39;self&#39;" />
+	<title>Kilobyte — Free WebP &amp; AVIF Image Optimizer for WordPress</title>
+	<meta name="description" content="Free WordPress plugin and local browser tools to shrink images to WebP and AVIF. Keeps original Media Library files untouched with zero quotas or uploads." />
 	<link rel="canonical" href="https://kilobyte.gabi.to/" />
 
 	<meta property="og:type" content="website" />
+	<meta property="og:site_name" content="Kilobyte" />
 	<meta property="og:url" content="https://kilobyte.gabi.to/" />
-	<meta property="og:title" content="Kilobyte Image Optimizer for WordPress" />
-	<meta property="og:description" content="Kilobyte makes smaller WebP and AVIF copies of your WordPress images. Your original Media Library files and existing links stay untouched, and you can test one photo before you optimize the rest." />
-	<meta property="og:image" content="https://kilobyte.gabi.to/assets/banner-1544x500.jpg" />
+	<meta property="og:title" content="Kilobyte — Free WebP &amp; AVIF Image Optimizer for WordPress" />
+	<meta property="og:description" content="Free WordPress plugin and local browser tools to shrink images to WebP and AVIF. Keeps original Media Library files untouched with zero quotas or uploads." />
+	<meta property="og:image" content="https://kilobyte.gabi.to/assets/og-card-1200x630.jpg" />
+	<meta property="og:image:width" content="1200" />
+	<meta property="og:image:height" content="630" />
+	<meta property="og:image:alt" content="Kilobyte — Free browser-powered WebP, AVIF, JPEG, and PNG image optimization tools and WordPress plugin." />
 	<meta name="twitter:card" content="summary_large_image" />
-	<meta name="twitter:title" content="Kilobyte Image Optimizer for WordPress" />
-	<meta name="twitter:description" content="Kilobyte makes smaller WebP and AVIF copies of your WordPress images. Your original Media Library files and existing links stay untouched, and you can test one photo before you optimize the rest." />
-	<meta name="twitter:image" content="https://kilobyte.gabi.to/assets/banner-1544x500.jpg" />
+	<meta name="twitter:title" content="Kilobyte — Free WebP &amp; AVIF Image Optimizer for WordPress" />
+	<meta name="twitter:description" content="Free WordPress plugin and local browser tools to shrink images to WebP and AVIF. Keeps original Media Library files untouched with zero quotas or uploads." />
+	<meta name="twitter:image" content="https://kilobyte.gabi.to/assets/og-card-1200x630.jpg" />
+	<meta name="twitter:image:alt" content="Kilobyte — Free browser-powered WebP, AVIF, JPEG, and PNG image optimization tools and WordPress plugin." />
 
-	<link rel="icon" type="image/png" href="assets/icon-128x128.png" />
-	<link rel="preconnect" href="https://fonts.googleapis.com" />
-	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-	<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400..600;1,400..600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
-	<link rel="preload" as="image" href="assets/banner-1544x500.webp" type="image/webp" />
-	<link rel="stylesheet" href="dist/landing.css" />
+	<link rel="icon" type="image/png" href="/assets/icon-128x128.png" />
+	<link rel="preload" as="font" href="/assets/fonts/eb-garamond-latin-wght-normal.woff2" type="font/woff2" crossorigin />
+	<link rel="preload" as="font" href="/assets/fonts/inter-latin-wght-normal.woff2" type="font/woff2" crossorigin />
+	<link rel="preload" as="image" href="/assets/banner-1544x500.webp" type="image/webp" />
+	<link rel="stylesheet" href="/dist/site.f3bf5b37.css" />
+	<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","@id":"https://kilobyte.gabi.to/#website","name":"Kilobyte","url":"https://kilobyte.gabi.to/","description":"Free, browser-powered WebP, AVIF, JPEG, and PNG image optimization utilities and WordPress plugin.","publisher":{"@type":"Person","@id":"https://kilobyte.gabi.to/#author","name":"Joseph Gabito","url":"https://joseph.gabi.to"}}</script>
+	<script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","@id":"https://kilobyte.gabi.to/#software","name":"Kilobyte Image Optimizer","description":"Free WordPress plugin and local browser tools to shrink images to WebP and AVIF. Keeps original Media Library files untouched with zero quotas or uploads.","softwareVersion":"1.1.0","applicationCategory":"MultimediaApplication","operatingSystem":"WordPress 6.6+, Web","url":"https://kilobyte.gabi.to/","installUrl":"https://wordpress.org/plugins/kilobyte-image-optimizer/","image":"https://kilobyte.gabi.to/assets/og-card-1200x630.jpg","sameAs":["https://wordpress.org/plugins/kilobyte-image-optimizer/","https://github.com/JosephGabito/kilobyte-image-optimizer"],"author":{"@type":"Person","@id":"https://kilobyte.gabi.to/#author","name":"Joseph Gabito","url":"https://joseph.gabi.to"},"isAccessibleForFree":true,"license":"https://www.gnu.org/licenses/gpl-2.0.html","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}}</script>
+	<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Is Kilobyte really free and unlimited?","acceptedAnswer":{"@type":"Answer","text":"Yes. Kilobyte is free, has no limits, and needs no account. Images are compressed in your own browser, or by your WordPress site’s image editor, so there are no compression servers for anyone to pay for."}},{"@type":"Question","name":"Will it overwrite my original photos or break cached pages?","acceptedAnswer":{"@type":"Answer","text":"No. Kilobyte keeps your original files and their links, and saves each smaller WebP or AVIF image as a separate copy. Browsers that cannot show the copy get the original. If you restore an image, the old copies stay available for at least 24 hours, so cached pages keep working. If your page cache keeps pages for longer than a day, clear the affected pages after you restore."}},{"@type":"Question","name":"What happens to animated GIFs, APNGs, and animated WebPs?","acceptedAnswer":{"@type":"Answer","text":"Kilobyte checks each image before it compresses anything. Animated GIFs, APNGs, and animated WebPs are left exactly as they are, so the animation keeps working. Still GIFs can get smaller WebP or AVIF copies."}},{"@type":"Question","name":"What does my site need to run Kilobyte?","acceptedAnswer":{"@type":"Answer","text":"WordPress 6.6 or newer and PHP 7.4 or newer. Your host also needs GD or Imagick, the standard WordPress image editors, which almost every host has. Kilobyte does not need exec() or any extra server software."}},{"@type":"Question","name":"Can an AI assistant use Kilobyte?","acceptedAnswer":{"@type":"Answer","text":"Yes. On WordPress 6.9 and newer, Kilobyte registers seven abilities through the WordPress Abilities API. An AI assistant or MCP adapter connected to your site can read savings, list the images still waiting, optimize or restore an image, regenerate thumbnails, and change settings. WordPress checks the user’s permissions on every call."}}]}</script>
 </head>
 <body>
-	<div id="kilobyte-landing-root"></div>
+<a class="kb-skip-link" href="#main-content">Skip to main content</a>
+<header class="kb-topbar">
+	<div class="kb-container kb-topbar-inner">
+		<div class="kb-topbar-left">
+			<a class="kb-brand" href="/" aria-label="Kilobyte home" aria-current="page">Kilobyte</a>
+			<nav class="kb-nav" aria-label="Primary navigation">
+			<a href="/tools/">Tools</a>
+			<a href="#demo">Try it here</a>
+			<a href="#why">Why Kilobyte</a>
+			<a href="#screens">Screens</a>
+			<a href="#developers">Developers</a>
+			<a href="#questions">Questions</a>
+			</nav>
+		</div>
+		<div class="kb-topbar-actions">
+			<a class="kb-topbar-link kb-topbar-github" href="https://github.com/JosephGabito/kilobyte-image-optimizer" target="_blank" rel="noopener noreferrer">GitHub</a>
+			<a class="kb-btn kb-btn-primary kb-topbar-cta" href="https://wordpress.org/plugins/kilobyte-image-optimizer/" target="_blank" rel="noopener noreferrer">Get WP plugin</a>
+			<details class="kb-mobile-nav">
+				<summary class="kb-mobile-nav-trigger" aria-label="Toggle navigation menu"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M4 7.5h16V6H4v1.5zm0 5.25h16v-1.5H4v1.5zM4 18h16v-1.5H4V18z"/></svg><span>Menu</span></summary>
+				<nav class="kb-mobile-nav-panel" aria-label="Mobile navigation">
+				<a href="/tools/">Tools</a>
+				<a href="#demo">Try it here</a>
+				<a href="#why">Why Kilobyte</a>
+				<a href="#screens">Screens</a>
+				<a href="#developers">Developers</a>
+				<a href="#questions">Questions</a>
+					<a href="https://github.com/JosephGabito/kilobyte-image-optimizer" target="_blank" rel="noopener noreferrer">GitHub</a>
+				</nav>
+			</details>
+		</div>
+	</div>
+</header>
+<main id="main-content">
+	<section class="kb-hero">
+		<div class="kb-band kb-hero-band">
+			<div class="kb-container">
+				<h1 class="kb-display">Shrink WordPress images to WebP <span class="kb-amp">&amp;</span> AVIF.</h1>
+				<p class="kb-quiet">Your original files stay untouched.</p>
+				<p class="kb-lead">Kilobyte makes smaller WebP and AVIF copies of the images in your Media Library. Your original files and existing links stay exactly as they are, and you can test one photo before you optimize the rest.</p>
+				<div class="kb-actions">
+					<a class="kb-btn kb-btn-primary kb-btn-lg" href="https://wordpress.org/plugins/kilobyte-image-optimizer/" target="_blank" rel="noopener noreferrer"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18 11.3l-1-1.1-4 4V3h-1.5v11.3L7 10.2l-1 1.1 6.2 5.8 5.8-5.8zm.5 3.7v3.5h-13V15H4v5h16v-5h-1.5z"/></svg><span>Download on WordPress.org</span></a>
+					<a class="kb-btn kb-btn-secondary kb-btn-lg" href="https://playground.wordpress.net/?blueprint-url=https://raw.githubusercontent.com/JosephGabito/kilobyte-image-optimizer/main/.wordpress-org/blueprints/blueprint.json" target="_blank" rel="noopener noreferrer"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M19.5 4.5h-7V6h4.44l-5.97 5.97 1.06 1.06L18 7.06v4.44h1.5v-7Zm-13 1a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3H17v3a.5.5 0 0 1-.5.5h-10a.5.5 0 0 1-.5-.5v-10a.5.5 0 0 1 .5-.5h3V5.5h-3Z"/></svg><span>Try it in a demo site</span></a>
+				</div>
+				<p class="kb-small">The demo site is a real WordPress site that runs in your browser, with Kilobyte and 3 sample images already set up.</p>
+			</div>
+		</div>
 
-	<noscript>
-		<main style="max-width:720px;margin:48px auto;padding:0 20px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#1e1e1e;line-height:1.6;">
-			<h1>Kilobyte Image Optimizer for WordPress</h1>
-			<p>Kilobyte makes smaller WebP and AVIF copies of your WordPress images. Your original Media Library files and existing links stay untouched, and you can test one photo before you optimize the rest.</p>
-			<p>
-				<a href="https://wordpress.org/plugins/kilobyte-image-optimizer/">Download on WordPress.org</a>
-				&middot;
-				<a href="https://playground.wordpress.net/?blueprint-url=https://raw.githubusercontent.com/JosephGabito/kilobyte-image-optimizer/main/.wordpress-org/blueprints/blueprint.json">Try it in a demo site</a>
-				&middot;
-				<a href="https://github.com/JosephGabito/kilobyte-image-optimizer">Source code on GitHub</a>
-			</p>
-		</main>
-	</noscript>
+		<div class="kb-container kb-hero-media">
+			<div class="kb-banner">
+				<img src="/assets/banner-1544x500.webp" alt="A Renaissance-style painting of a scholar who holds up a light 507 KB picture next to a heavy 3.81 MB stone slab bound in chains" width="1544" height="500" fetchpriority="high" />
+			</div>
 
-	<script src="dist/landing.js" defer></script>
+			<div class="kb-grid kb-tiles">
+				<article class="kb-card kb-tile">
+					<h2 class="kb-h3">Free, with no limits</h2>
+					<p class="kb-body">Optimize as many images as you like. There is no account, no API key, and no monthly quota.</p>
+				</article>
+				<article class="kb-card kb-tile">
+					<h2 class="kb-h3">Your originals are kept</h2>
+					<p class="kb-body">Kilobyte saves each smaller image as a separate copy. Your original files and their links stay the same.</p>
+				</article>
+				<article class="kb-card kb-tile">
+					<h2 class="kb-h3">Works with AI assistants</h2>
+					<p class="kb-body">An AI assistant connected to your site can check savings, optimize images, and restore them for you.</p>
+				</article>
+			</div>
+		</div>
+	</section>
+
+	<section id="demo" class="kb-section kb-section-wash">
+		<div class="kb-container">
+			<div class="kb-grid kb-head">
+				<p class="kb-kicker">Try it on this page</p>
+				<h2 class="kb-title">See how much smaller your own photo gets.</h2>
+				<p class="kb-lead">Choose a photo, or drop one onto the card below. The compression runs here in your browser, so the photo never leaves your device. Drag the handle across the picture to compare the original with the smaller copy.</p>
+			</div>
+
+			<div class="kb-card kb-lab-card" id="kb-home-lab" data-tool-widget>
+	<script type="application/json" data-role="tool-config">{"slug":"home-demo","accept":"image/jpeg,image/png,image/webp,image/avif,image/gif,image/bmp","defaultOutputMime":"image/webp","allowedOutputMimes":["image/webp","image/avif","image/jpeg","image/png"],"defaultQuality":82,"defaultPngMode":"lossy","showResize":false,"batchFocused":false,"sampleUrl":"/assets/sample-photo.jpg","autoLoadSample":true,"workerUrl":"/dist/tool-worker.f2425cdf.js"}</script>
+
+	<div class="kb-card-header">
+		<h3 class="kb-h3">Quality preview</h3>
+		<div class="kb-lab-buttons">
+			<button type="button" class="kb-btn kb-btn-primary" data-role="pick-btn"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18.5 15v3.5H13V6.7l4.5 4.1 1-1.1-6.2-5.8-5.8 5.8 1 1.1 4-4v11.7h-6V15H4v5h16v-5h-1.5z"/></svg><span>Choose image</span></button>
+			<input type="file" class="sr-only" tabindex="-1" aria-hidden="true" accept="image/jpeg,image/png,image/webp,image/avif,image/gif,image/bmp" multiple data-role="file-input" />
+			<button type="button" class="kb-btn kb-btn-ghost" data-role="sample-btn"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 5V2L8 6l4 4V7c3.3 0 6 2.7 6 6s-2.7 6-6 6-6-2.7-6-6H4c0 4.4 3.6 8 8 8s8-3.6 8-8-3.6-8-8-8z"/></svg><span>Use sample photo</span></button>
+			<button type="button" class="kb-btn kb-btn-danger" data-role="cancel-btn" hidden>Cancel</button>
+			<button type="button" class="kb-btn kb-btn-ghost" data-role="clear-btn" hidden>Clear</button>
+		</div>
+	</div>
+
+	<div class="kb-card-body kb-lab-body">
+		<div class="kb-dropzone" data-role="dropzone" role="button" tabindex="0">
+			<p class="kb-dropzone-title">Drop one or more images here, or click to browse</p>
+			<p class="kb-small">Accepts JPEG, PNG, WebP, AVIF, still GIF, or BMP (up to 24 MB / 40 MP). Processed 100% locally in your browser.</p>
+		</div>
+
+		<div class="kb-lab-controls">
+			<div class="kb-control-group">
+			<span class="kb-control-label">Output format</span>
+			<div class="kb-seg" role="group" aria-label="Output format"><button type="button" class="kb-seg-btn is-active" data-role="format-btn" data-mime="image/webp" aria-pressed="true">WebP</button><button type="button" class="kb-seg-btn" data-role="format-btn" data-mime="image/avif" aria-pressed="false">AVIF</button><button type="button" class="kb-seg-btn" data-role="format-btn" data-mime="image/jpeg" aria-pressed="false">JPEG</button><button type="button" class="kb-seg-btn" data-role="format-btn" data-mime="image/png" aria-pressed="false">PNG</button></div>
+		</div>
+			<div class="kb-control-group" data-role="preset-group">
+			<span class="kb-control-label">Compression preset</span>
+			<div class="kb-seg" role="group" aria-label="Compression preset">
+				<button type="button" class="kb-seg-btn" data-role="preset-btn" data-quality="90" aria-pressed="false">High</button>
+				<button type="button" class="kb-seg-btn is-active" data-role="preset-btn" data-quality="82" aria-pressed="true">Balanced</button>
+				<button type="button" class="kb-seg-btn" data-role="preset-btn" data-quality="72" aria-pressed="false">Smallest</button>
+			</div>
+		</div>
+
+			<div class="kb-control-group" data-role="png-mode-group" hidden>
+			<span class="kb-control-label">PNG mode</span>
+			<div class="kb-seg" role="group" aria-label="PNG optimization mode">
+				<button type="button" class="kb-seg-btn is-active" data-role="png-mode-btn" data-mode="lossy" aria-pressed="true">Palette (smaller)</button>
+				<button type="button" class="kb-seg-btn" data-role="png-mode-btn" data-mode="lossless" aria-pressed="false">Lossless</button>
+			</div>
+		</div>
+		</div>
+
+
+
+		<div class="kb-notice-wrap" aria-live="polite" aria-atomic="true">
+			<div class="kb-notice" role="status" data-role="notice" hidden></div>
+		</div>
+
+		<div data-role="single-view">
+			<dl class="kb-lab-stats">
+				<div class="kb-lab-stat">
+					<dt data-role="orig-label">Original</dt>
+					<dd class="kb-lab-stat-value" data-role="orig-size">--</dd>
+					<dd class="kb-lab-stat-note" data-role="orig-dims">Waiting for image</dd>
+				</div>
+				<div class="kb-lab-stat">
+					<dt data-role="opt-label">Output (WebP)</dt>
+					<dd class="kb-lab-stat-value" data-role="opt-size">--</dd>
+					<dd class="kb-lab-stat-note" data-role="opt-meta">Local encoder ready</dd>
+				</div>
+				<div class="kb-lab-stat" data-role="savings-stat">
+					<dt>Measured change</dt>
+					<dd class="kb-lab-stat-value" data-role="savings-val">--</dd>
+					<dd class="kb-lab-stat-note" data-role="savings-note">Select an image to measure</dd>
+				</div>
+			</dl>
+
+			<div class="kb-compare-stage kb-checkerboard" data-role="compare-stage">
+				<img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" width="1" height="1" alt="Original image preview" class="kb-compare-img kb-compare-before" data-role="before-img" hidden />
+				<div class="kb-compare-after" data-role="after-wrap">
+					<img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" width="1" height="1" alt="Optimized image preview" class="kb-compare-img" data-role="after-img" hidden />
+				</div>
+				<span class="kb-compare-tag kb-compare-tag-left" data-role="left-tag" hidden>Original</span>
+				<span class="kb-compare-tag kb-compare-tag-right" data-role="right-tag" hidden>WebP</span>
+				<input type="range" min="0" max="100" value="50" class="kb-compare-range" data-role="split-range" aria-label="Slide to compare original and optimized image" disabled hidden />
+				<div class="kb-compare-divider" data-role="split-divider" aria-hidden="true" hidden>
+					<span class="kb-compare-handle">&harr;</span>
+				</div>
+				<div class="kb-compare-empty" data-role="empty-stage">
+					Loading sample photo locally...
+				</div>
+			</div>
+		</div>
+
+		<div class="kb-batch-wrap" data-role="batch-view" hidden>
+			<div class="kb-batch-summary" aria-live="polite">
+				<div>
+					<strong data-role="batch-headline">No images queued yet.</strong>
+					<p class="kb-small" data-role="batch-subline">Drop multiple files to process up to 3 concurrently in browser Web Workers.</p>
+				</div>
+				<div class="kb-lab-buttons">
+					<button type="button" class="kb-btn kb-btn-primary" data-role="zip-btn" disabled><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18 11.3l-1-1.1-4 4V3h-1.5v11.3L7 10.2l-1 1.1 6.2 5.8 5.8-5.8zm.5 3.7v3.5h-13V15H4v5h16v-5h-1.5z"/></svg><span>Download all (.zip)</span></button>
+				</div>
+			</div>
+			<ul class="kb-batch-list" data-role="batch-list"></ul>
+		</div>
+
+		<noscript>
+			<div class="kb-notice is-warning">
+				Enable JavaScript to run the local browser image encoder on this page. Your images are never uploaded to any server.
+			</div>
+		</noscript>
+	</div>
+
+	<div class="kb-card-footer">
+		<p class="kb-small" data-role="status-line" role="status" aria-live="polite">100% local browser processing. Your image files never leave your device.</p>
+		<button type="button" class="kb-btn kb-btn-secondary" data-role="download-placeholder" disabled><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18 11.3l-1-1.1-4 4V3h-1.5v11.3L7 10.2l-1 1.1 6.2 5.8 5.8-5.8zm.5 3.7v3.5h-13V15H4v5h16v-5h-1.5z"/></svg><span data-role="download-placeholder-label">Download WebP</span></button>
+		<a class="kb-btn kb-btn-secondary" data-role="download-btn" hidden><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18 11.3l-1-1.1-4 4V3h-1.5v11.3L7 10.2l-1 1.1 6.2 5.8 5.8-5.8zm.5 3.7v3.5h-13V15H4v5h16v-5h-1.5z"/></svg><span data-role="download-label">Download WebP</span></a>
+	</div>
+</div>
+		</div>
+	</section>
+
+	<section class="kb-section">
+		<div class="kb-container">
+			<div class="kb-grid kb-head">
+				<p class="kb-kicker">Standalone browser utilities</p>
+				<h2 class="kb-title">Need a quick image tool without WordPress?</h2>
+				<p class="kb-lead">Use Kilobyte’s free local image utilities directly in your browser—built on the same local browser core, extended with optional WebAssembly codecs for PNG, WebP, and AVIF. Zero uploads, no accounts, and batch ZIP export.</p>
+			</div>
+
+			<div class="kb-tools-grid">
+				<a class="kb-tool-card" href="/tools/compress-image/">
+					<div>
+						<h3 class="kb-h3">Compress Image</h3>
+						<p class="kb-body kb-tool-card-summary">Optimize JPEG, PNG, WebP, AVIF, GIF, or BMP locally with live before/after inspection.</p>
+					</div>
+					<span class="kb-tool-card-meta"><span>Open tool</span><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13.5 6l-1.1 1.1 4.1 4.1H4v1.5h12.5l-4.1 4.1 1.1 1.1 6-6-6-6z"/></svg></span>
+				</a>
+<a class="kb-tool-card" href="/tools/compress-png/">
+					<div>
+						<h3 class="kb-h3">Compress PNG</h3>
+						<p class="kb-body kb-tool-card-summary">Shrink PNG screenshots, logos, and transparent graphics via palette quantization or lossless OxiPNG.</p>
+					</div>
+					<span class="kb-tool-card-meta"><span>Open tool</span><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13.5 6l-1.1 1.1 4.1 4.1H4v1.5h12.5l-4.1 4.1 1.1 1.1 6-6-6-6z"/></svg></span>
+				</a>
+<a class="kb-tool-card" href="/tools/jpg-to-webp/">
+					<div>
+						<h3 class="kb-h3">JPG to WebP</h3>
+						<p class="kb-body kb-tool-card-summary">Convert JPEG photographs into lightweight WebP copies with real measured savings.</p>
+					</div>
+					<span class="kb-tool-card-meta"><span>Open tool</span><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13.5 6l-1.1 1.1 4.1 4.1H4v1.5h12.5l-4.1 4.1 1.1 1.1 6-6-6-6z"/></svg></span>
+				</a>
+<a class="kb-tool-card" href="/tools/jpg-to-avif/">
+					<div>
+						<h3 class="kb-h3">JPG to AVIF</h3>
+						<p class="kb-body kb-tool-card-summary">Convert JPEG photos to compact AVIF files with native speed and WASM fallback.</p>
+					</div>
+					<span class="kb-tool-card-meta"><span>Open tool</span><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13.5 6l-1.1 1.1 4.1 4.1H4v1.5h12.5l-4.1 4.1 1.1 1.1 6-6-6-6z"/></svg></span>
+				</a>
+<a class="kb-tool-card" href="/tools/resize-image/">
+					<div>
+						<h3 class="kb-h3">Resize Image</h3>
+						<p class="kb-body kb-tool-card-summary">Resize photos to exact width/height or common web sizes with aspect-ratio lock and high-quality scaling.</p>
+					</div>
+					<span class="kb-tool-card-meta"><span>Open tool</span><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13.5 6l-1.1 1.1 4.1 4.1H4v1.5h12.5l-4.1 4.1 1.1 1.1 6-6-6-6z"/></svg></span>
+				</a>
+<a class="kb-tool-card" href="/tools/bulk-image-compressor/">
+					<div>
+						<h3 class="kb-h3">Bulk Image Compressor</h3>
+						<p class="kb-body kb-tool-card-summary">Batch compress and convert dozens of photos in parallel with live totals and ZIP export.</p>
+					</div>
+					<span class="kb-tool-card-meta"><span>Open tool</span><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13.5 6l-1.1 1.1 4.1 4.1H4v1.5h12.5l-4.1 4.1 1.1 1.1 6-6-6-6z"/></svg></span>
+				</a>
+			</div>
+
+			<div class="kb-tools-cta">
+				<a class="kb-btn kb-btn-secondary" href="/tools/"><span>Browse all 9 browser tools</span><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13.5 6l-1.1 1.1 4.1 4.1H4v1.5h12.5l-4.1 4.1 1.1 1.1 6-6-6-6z"/></svg></a>
+			</div>
+		</div>
+	</section>
+
+	<section id="why" class="kb-section kb-section-wash">
+		<div class="kb-container">
+			<div class="kb-grid kb-head">
+				<p class="kb-kicker">Why Kilobyte</p>
+				<h2 class="kb-title">Designed to feel like a missing WordPress Core feature.</h2>
+				<p class="kb-lead">Kilobyte adds one screen under Media in your WordPress admin. It shows no ads, asks for no account, and never changes your original files.</p>
+			</div>
+
+			<div class="kb-grid kb-why">
+				<div class="kb-why-item">
+					<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M10.5 4v4h3V4H15v4h1.25a.75.75 0 0 1 .75.75V12a5 5 0 0 1-4.25 4.94V20h-1.5v-3.06A5 5 0 0 1 7 12V8.75a.75.75 0 0 1 .75-.75H9V4h1.5zm5 5.5h-7V12a3.5 3.5 0 1 0 7 0V9.5z"/></svg>
+					<h3 class="kb-h3">Works on activation</h3>
+					<p class="kb-body">There is no account to create and no API key to paste. Images are compressed in your browser, or by the image editor your WordPress site already has.</p>
+				</div>
+				<div class="kb-why-item">
+					<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M4 20h8v-1.5H4V20zM18.9 3.5c-.6-.6-1.5-.6-2.1 0l-7.2 7.2c-.4-.1-.7 0-1.1.1-.5.2-1.5.7-1.9 2.2-.4 1.7-.8 2.2-1.1 2.7-.1.1-.2.3-.3.4l-.6 1.1H6c2 0 3.4-.4 4.7-1.4.8-.6 1.2-1.4 1.3-2.3 0-.3 0-.5-.1-.7L19 5.7c.5-.6.5-1.6-.1-2.2zM9.7 14.7c-.7.5-1.5.8-2.4 1 .2-.5.5-1.2.8-2.3.2-.6.4-1 .8-1.1.5-.1 1 .1 1.3.3.2.2.3.5.2.8 0 .3-.1.9-.7 1.3z"/></svg>
+					<h3 class="kb-h3">No ads or upsells</h3>
+					<p class="kb-body">Kilobyte shows no upgrade banners. Every setting you see is included and free.</p>
+				</div>
+				<div class="kb-why-item">
+					<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 13.8h6v-1.5H7v1.5zM18 16V4c0-1.1-.9-2-2-2H6c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2zM5.5 16V4c0-.3.2-.5.5-.5h10c.3 0 .5.2.5.5v12c0 .3-.2.5-.5.5H6c-.3 0-.5-.2-.5-.5zM7 10.5h8V9H7v1.5zm0-3.3h8V5.8H7v1.4zM20.2 6v13c0 .7-.6 1.2-1.2 1.2H8v1.5h11c1.5 0 2.7-1.2 2.7-2.8V6h-1.5z"/></svg>
+					<h3 class="kb-h3">Looks like WordPress</h3>
+					<p class="kb-body">The Kilobyte screen is built from WordPress’s own interface components, so it looks and behaves like the rest of your admin.</p>
+				</div>
+				<div class="kb-why-item">
+					<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3L4 6.5v5.1c0 4.9 3.4 9.5 8 10.6 4.6-1.1 8-5.7 8-10.6V6.5L12 3zm6.5 8.6c0 4.1-2.7 7.9-6.5 9-3.8-1.1-6.5-4.9-6.5-9V7.5L12 4.7l6.5 2.8v4.1z"/></svg>
+					<h3 class="kb-h3">Safe by default</h3>
+					<p class="kb-body">Browsers that cannot show WebP or AVIF get your original image. If you restore an image, the old copies stay available for at least 24 hours, so cached pages keep working.</p>
+				</div>
+			</div>
+
+			<dl class="kb-specs-strip" aria-label="WordPress plugin specifications">
+				<div>
+					<dt>Input formats</dt>
+					<dd>JPEG, PNG, BMP, static GIF</dd>
+				</div>
+				<div>
+					<dt>Output copies</dt>
+					<dd>WebP &amp; AVIF (originals kept)</dd>
+				</div>
+				<div>
+					<dt>Browser safety cap</dt>
+					<dd>24 MB / 40 MP (server fallback)</dd>
+				</div>
+				<div>
+					<dt>Requirements</dt>
+					<dd>WordPress 6.6+, PHP 7.4+, GD/Imagick</dd>
+				</div>
+				<div>
+					<dt>License &amp; privacy</dt>
+					<dd>GPL-2.0+, zero third-party uploads</dd>
+				</div>
+			</dl>
+		</div>
+	</section>
+
+	<section id="screens" class="kb-section">
+		<div class="kb-container">
+			<div class="kb-grid kb-head">
+				<p class="kb-kicker">Inside the plugin</p>
+				<h2 class="kb-title">See every Kilobyte screen before you install.</h2>
+				<p class="kb-lead">Kilobyte has four tabs, and it adds one line to each image in your Media Library. Select a picture to view it full size.</p>
+			</div>
+
+			<div class="kb-grid">
+				<ul class="kb-screen-list">
+					<li>
+						<button type="button" class="kb-screen-tab" data-screen-tab="preview" data-src="/assets/screen-preview.webp" data-alt="The Preview tab of Kilobyte, showing an original 2.03 MB photo next to a 115.5 KB WebP copy" data-title="Preview" data-body="Compare one photo before and after, side by side. Nothing is saved until you choose Optimize now." data-width="1700" data-height="944" aria-pressed="true">
+							<span class="kb-h3">Preview</span>
+							<span class="kb-small">Compare one photo before and after, side by side. Nothing is saved until you choose Optimize now.</span>
+						</button>
+						<button type="button" class="kb-screen-inline" data-open-modal="preview" aria-label="View the Preview screen full size">
+							<img src="/assets/screen-preview.webp" alt="The Preview tab of Kilobyte, showing an original 2.03 MB photo next to a 115.5 KB WebP copy" width="1700" height="944" loading="lazy" />
+						</button>
+					</li>
+<li>
+						<button type="button" class="kb-screen-tab" data-screen-tab="selective" data-src="/assets/screen-selective.webp" data-alt="The Selective optimize tab of Kilobyte, with five Media Library images chosen for optimizing" data-title="Selective optimize" data-body="Choose specific photos from your Media Library and optimize only those." data-width="1720" data-height="832" aria-pressed="false">
+							<span class="kb-h3">Selective optimize</span>
+							<span class="kb-small">Choose specific photos from your Media Library and optimize only those.</span>
+						</button>
+						<button type="button" class="kb-screen-inline" data-open-modal="selective" aria-label="View the Selective optimize screen full size">
+							<img src="/assets/screen-selective.webp" alt="The Selective optimize tab of Kilobyte, with five Media Library images chosen for optimizing" width="1720" height="832" loading="lazy" />
+						</button>
+					</li>
+<li>
+						<button type="button" class="kb-screen-tab" data-screen-tab="bulk" data-src="/assets/screen-bulk.webp" data-alt="The Bulk optimize tab of Kilobyte, showing 21 images processed and 8.61 MB saved" data-title="Bulk optimize" data-body="Optimize your whole Media Library in one run. The screen lists every image and has a Restore all button." data-width="1200" data-height="1408" aria-pressed="false">
+							<span class="kb-h3">Bulk optimize</span>
+							<span class="kb-small">Optimize your whole Media Library in one run. The screen lists every image and has a Restore all button.</span>
+						</button>
+						<button type="button" class="kb-screen-inline" data-open-modal="bulk" aria-label="View the Bulk optimize screen full size">
+							<img src="/assets/screen-bulk.webp" alt="The Bulk optimize tab of Kilobyte, showing 21 images processed and 8.61 MB saved" width="1200" height="1408" loading="lazy" />
+						</button>
+					</li>
+<li>
+						<button type="button" class="kb-screen-tab" data-screen-tab="preference" data-src="/assets/screen-preference.webp" data-alt="The Preference tab of Kilobyte, with format, compression level, and advanced quality settings" data-title="Preference" data-body="Choose the image format and the compression level. Quality and maximum size are under Advanced." data-width="1136" data-height="1360" aria-pressed="false">
+							<span class="kb-h3">Preference</span>
+							<span class="kb-small">Choose the image format and the compression level. Quality and maximum size are under Advanced.</span>
+						</button>
+						<button type="button" class="kb-screen-inline" data-open-modal="preference" aria-label="View the Preference screen full size">
+							<img src="/assets/screen-preference.webp" alt="The Preference tab of Kilobyte, with format, compression level, and advanced quality settings" width="1136" height="1360" loading="lazy" />
+						</button>
+					</li>
+<li>
+						<button type="button" class="kb-screen-tab" data-screen-tab="media-library" data-src="/assets/screen-media-library.webp" data-alt="A WordPress Media Library image whose details show a 94.4 percent saving and a Restore original link" data-title="Media Library" data-body="Each image in your Media Library shows how much smaller its copy is, next to a Restore original link." data-width="1488" data-height="1084" aria-pressed="false">
+							<span class="kb-h3">Media Library</span>
+							<span class="kb-small">Each image in your Media Library shows how much smaller its copy is, next to a Restore original link.</span>
+						</button>
+						<button type="button" class="kb-screen-inline" data-open-modal="media-library" aria-label="View the Media Library screen full size">
+							<img src="/assets/screen-media-library.webp" alt="A WordPress Media Library image whose details show a 94.4 percent saving and a Restore original link" width="1488" height="1084" loading="lazy" />
+						</button>
+					</li>
+				</ul>
+
+				<button type="button" class="kb-screen-frame" id="kb-screen-frame" aria-label="View the Preview screen full size">
+					<img id="kb-screen-frame-img" src="/assets/screen-preview.webp" alt="The Preview tab of Kilobyte, showing an original 2.03 MB photo next to a 115.5 KB WebP copy" width="1700" height="944" loading="lazy" />
+				</button>
+			</div>
+		</div>
+	</section>
+
+	<section id="developers" class="kb-section kb-section-wash">
+		<div class="kb-container kb-grid">
+			<div class="kb-dev-text">
+				<p class="kb-kicker">For developers and AI assistants</p>
+				<h2 class="kb-title">Run Kilobyte from code, the command line, or an AI assistant.</h2>
+				<p class="kb-lead">Kilobyte follows the WordPress VIP Go coding standards, loads no Composer packages in production, and is covered by more than 510 integration tests that run against real WordPress.</p>
+
+				<dl class="kb-dev-list">
+					<div>
+						<dt>WordPress Abilities API</dt>
+						<dd class="kb-body">On WordPress 6.9 and newer, Kilobyte registers seven abilities that AI assistants and MCP adapters can call. Each one has a JSON schema and checks the user’s permission for the image.</dd>
+					</div>
+					<div>
+						<dt>WP-CLI</dt>
+						<dd class="kb-body">Check savings, optimize in batches, restore images, and clear old backup records from your terminal or deploy scripts.</dd>
+					</div>
+					<div>
+						<dt>PHP hooks</dt>
+						<dd class="kb-body">Lock settings in code across client sites, skip chosen images, and purge your page cache when a copy is created or restored.</dd>
+					</div>
+				</dl>
+			</div>
+
+			<div class="kb-card kb-code-card" id="kb-code-tabs">
+				<div class="kb-tabs" role="tablist" aria-label="Developer interfaces">
+					<button type="button" class="kb-tab-btn" role="tab" id="tab-abilities" aria-controls="panel-abilities" aria-selected="true" tabindex="0" data-code-tab="abilities">Abilities API</button><button type="button" class="kb-tab-btn" role="tab" id="tab-cli" aria-controls="panel-cli" aria-selected="false" tabindex="-1" data-code-tab="cli">WP-CLI</button><button type="button" class="kb-tab-btn" role="tab" id="tab-hooks" aria-controls="panel-hooks" aria-selected="false" tabindex="-1" data-code-tab="hooks">PHP hooks</button>
+				</div>
+				<div id="kb-copy-status" class="sr-only" role="status" aria-live="polite"></div>
+				<div class="kb-tab-panel" role="tabpanel" id="panel-abilities" aria-labelledby="tab-abilities" data-code-panel="abilities">
+					<div class="kb-code-toolbar">
+						<span class="kb-code-filename">WordPress 6.9 and newer</span>
+						<button type="button" class="kb-btn kb-btn-ghost kb-code-copy" data-copy-code="abilities"><span data-icon="copy"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.2 8v11c0 .7-.6 1.2-1.2 1.2H6v1.5h13c1.5 0 2.7-1.2 2.7-2.8V8h-1.5zM18 16.4V4.6c0-.9-.7-1.6-1.6-1.6H4.6C3.7 3 3 3.7 3 4.6v11.8c0 .9.7 1.6 1.6 1.6h11.8c.9 0 1.6-.7 1.6-1.6zm-13.5 0V4.6c0-.1.1-.1.1-.1h11.8c.1 0 .1.1.1.1v11.8c0 .1-.1.1-.1.1H4.6l-.1-.1z"/></svg></span><span data-icon="check" hidden><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.7 7.1l-6.3 8.5-3.3-2.5-.9 1.2 4.5 3.4L17.9 8z"/></svg></span><span>Copy code</span></button>
+					</div>
+					<pre class="kb-code-pre" tabindex="0" aria-label="Abilities API code example"><code id="code-abilities">// Available in PHP, over REST at /wp-json/wp-abilities/v1/,
+// and through MCP adapters.
+
+$stats = wp_get_ability( &#39;kilobyte/get-stats&#39; )-&gt;execute();
+
+$queue = wp_get_ability( &#39;kilobyte/get-queue&#39; )-&gt;execute(
+	array(
+		&#39;mode&#39;     =&gt; &#39;optimize&#39;,
+		&#39;per_page&#39; =&gt; 25,
+	)
+);
+
+$result = wp_get_ability( &#39;kilobyte/optimize-image&#39; )-&gt;execute(
+	array( &#39;attachment_id&#39; =&gt; 42 )
+);
+
+// The other four abilities:
+// kilobyte/get-settings      kilobyte/update-settings
+// kilobyte/restore-image     kilobyte/regenerate-thumbnails</code></pre>
+				</div><div class="kb-tab-panel" role="tabpanel" id="panel-cli" aria-labelledby="tab-cli" data-code-panel="cli" hidden>
+					<div class="kb-code-toolbar">
+						<span class="kb-code-filename">wp kilobyte</span>
+						<button type="button" class="kb-btn kb-btn-ghost kb-code-copy" data-copy-code="cli"><span data-icon="copy"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.2 8v11c0 .7-.6 1.2-1.2 1.2H6v1.5h13c1.5 0 2.7-1.2 2.7-2.8V8h-1.5zM18 16.4V4.6c0-.9-.7-1.6-1.6-1.6H4.6C3.7 3 3 3.7 3 4.6v11.8c0 .9.7 1.6 1.6 1.6h11.8c.9 0 1.6-.7 1.6-1.6zm-13.5 0V4.6c0-.1.1-.1.1-.1h11.8c.1 0 .1.1.1.1v11.8c0 .1-.1.1-.1.1H4.6l-.1-.1z"/></svg></span><span data-icon="check" hidden><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.7 7.1l-6.3 8.5-3.3-2.5-.9 1.2 4.5 3.4L17.9 8z"/></svg></span><span>Copy code</span></button>
+					</div>
+					<pre class="kb-code-pre" tabindex="0" aria-label="WP-CLI code example"><code id="code-cli"># See how much your Media Library has saved.
+wp kilobyte stats
+wp kilobyte stats --reconcile
+
+# Optimize the next 100 images that still need it.
+wp kilobyte optimize --limit=100
+
+# Restore one image, or every image.
+wp kilobyte restore 42
+wp kilobyte restore --all
+
+# Clear old backup records after you archive them.
+wp kilobyte purge-backups</code></pre>
+				</div><div class="kb-tab-panel" role="tabpanel" id="panel-hooks" aria-labelledby="tab-hooks" data-code-panel="hooks" hidden>
+					<div class="kb-code-toolbar">
+						<span class="kb-code-filename">functions.php</span>
+						<button type="button" class="kb-btn kb-btn-ghost kb-code-copy" data-copy-code="hooks"><span data-icon="copy"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.2 8v11c0 .7-.6 1.2-1.2 1.2H6v1.5h13c1.5 0 2.7-1.2 2.7-2.8V8h-1.5zM18 16.4V4.6c0-.9-.7-1.6-1.6-1.6H4.6C3.7 3 3 3.7 3 4.6v11.8c0 .9.7 1.6 1.6 1.6h11.8c.9 0 1.6-.7 1.6-1.6zm-13.5 0V4.6c0-.1.1-.1.1-.1h11.8c.1 0 .1.1.1.1v11.8c0 .1-.1.1-.1.1H4.6l-.1-.1z"/></svg></span><span data-icon="check" hidden><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.7 7.1l-6.3 8.5-3.3-2.5-.9 1.2 4.5 3.4L17.9 8z"/></svg></span><span>Copy code</span></button>
+					</div>
+					<pre class="kb-code-pre" tabindex="0" aria-label="PHP hooks code example"><code id="code-hooks">// Lock settings in code across client sites.
+add_filter(
+	&#39;kilobyte_io_settings&#39;,
+	static function ( array $settings ): array {
+		$settings[&#39;format&#39;]  = &#39;webp&#39;;
+		$settings[&#39;quality&#39;] = 80;
+		return $settings;
+	}
+);
+
+// Skip chosen images.
+add_filter(
+	&#39;kilobyte_io_should_optimize&#39;,
+	static function ( bool $run, int $id ): bool {
+		return $run &amp;&amp; ! get_post_meta( $id, &#39;_keep_original&#39;, true );
+	},
+	10,
+	2
+);
+
+// Purge your page cache when a copy is created or restored.
+add_action(
+	&#39;kilobyte_io_variant_changed&#39;,
+	static function ( int $attachment_id ): void {
+		// Call your host or cache plugin here.
+	}
+);</code></pre>
+				</div>
+			</div>
+		</div>
+	</section>
+
+	<section id="questions" class="kb-section">
+		<div class="kb-container kb-grid">
+			<div class="kb-faq-head">
+				<p class="kb-kicker">Questions</p>
+				<h2 class="kb-title">What people ask before they install.</h2>
+			</div>
+
+			<div class="kb-faq-list">
+				<details class="kb-faq-item" open>
+					<summary>
+						<span class="kb-h3">Is Kilobyte really free and unlimited?</span>
+						<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.5 11.6L12 16l-5.5-4.4.9-1.2L12 14l4.5-3.6 1 1.2z"/></svg>
+					</summary>
+					<p class="kb-body">Yes. Kilobyte is free, has no limits, and needs no account. Images are compressed in your own browser, or by your WordPress site’s image editor, so there are no compression servers for anyone to pay for.</p>
+				</details>
+<details class="kb-faq-item">
+					<summary>
+						<span class="kb-h3">Will it overwrite my original photos or break cached pages?</span>
+						<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.5 11.6L12 16l-5.5-4.4.9-1.2L12 14l4.5-3.6 1 1.2z"/></svg>
+					</summary>
+					<p class="kb-body">No. Kilobyte keeps your original files and their links, and saves each smaller WebP or AVIF image as a separate copy. Browsers that cannot show the copy get the original. If you restore an image, the old copies stay available for at least 24 hours, so cached pages keep working. If your page cache keeps pages for longer than a day, clear the affected pages after you restore.</p>
+				</details>
+<details class="kb-faq-item">
+					<summary>
+						<span class="kb-h3">What happens to animated GIFs, APNGs, and animated WebPs?</span>
+						<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.5 11.6L12 16l-5.5-4.4.9-1.2L12 14l4.5-3.6 1 1.2z"/></svg>
+					</summary>
+					<p class="kb-body">Kilobyte checks each image before it compresses anything. Animated GIFs, APNGs, and animated WebPs are left exactly as they are, so the animation keeps working. Still GIFs can get smaller WebP or AVIF copies.</p>
+				</details>
+<details class="kb-faq-item">
+					<summary>
+						<span class="kb-h3">What does my site need to run Kilobyte?</span>
+						<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.5 11.6L12 16l-5.5-4.4.9-1.2L12 14l4.5-3.6 1 1.2z"/></svg>
+					</summary>
+					<p class="kb-body">WordPress 6.6 or newer and PHP 7.4 or newer. Your host also needs GD or Imagick, the standard WordPress image editors, which almost every host has. Kilobyte does not need exec() or any extra server software.</p>
+				</details>
+<details class="kb-faq-item">
+					<summary>
+						<span class="kb-h3">Can an AI assistant use Kilobyte?</span>
+						<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.5 11.6L12 16l-5.5-4.4.9-1.2L12 14l4.5-3.6 1 1.2z"/></svg>
+					</summary>
+					<p class="kb-body">Yes. On WordPress 6.9 and newer, Kilobyte registers seven abilities through the WordPress Abilities API. An AI assistant or MCP adapter connected to your site can read savings, list the images still waiting, optimize or restore an image, regenerate thumbnails, and change settings. WordPress checks the user’s permissions on every call.</p>
+				</details>
+			</div>
+		</div>
+	</section>
+
+	<section class="kb-band kb-close-band">
+		<div class="kb-container">
+			<h2 class="kb-title">Make your images smaller today, and keep every original.</h2>
+			<p class="kb-lead">Install Kilobyte Image Optimizer from WordPress.org, or try it first in a demo WordPress site that runs in your browser.</p>
+			<div class="kb-actions">
+				<a class="kb-btn kb-btn-primary kb-btn-lg" href="https://wordpress.org/plugins/kilobyte-image-optimizer/" target="_blank" rel="noopener noreferrer"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18 11.3l-1-1.1-4 4V3h-1.5v11.3L7 10.2l-1 1.1 6.2 5.8 5.8-5.8zm.5 3.7v3.5h-13V15H4v5h16v-5h-1.5z"/></svg><span>Download on WordPress.org</span></a>
+				<a class="kb-btn kb-btn-secondary kb-btn-lg" href="https://playground.wordpress.net/?blueprint-url=https://raw.githubusercontent.com/JosephGabito/kilobyte-image-optimizer/main/.wordpress-org/blueprints/blueprint.json" target="_blank" rel="noopener noreferrer"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M19.5 4.5h-7V6h4.44l-5.97 5.97 1.06 1.06L18 7.06v4.44h1.5v-7Zm-13 1a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3H17v3a.5.5 0 0 1-.5.5h-10a.5.5 0 0 1-.5-.5v-10a.5.5 0 0 1 .5-.5h3V5.5h-3Z"/></svg><span>Try it in a demo site</span></a>
+			</div>
+		</div>
+	</section>
+</main>
+<footer class="kb-footer">
+	<div class="kb-container kb-footer-inner">
+		<div class="kb-footer-brand">
+			<img src="/assets/icon-128x128.png" alt="" width="24" height="24" />
+			<p class="kb-small">Kilobyte is free, open-source image optimization software under the GPL, version 2 or later. All browser utilities run 100% locally on your device.</p>
+		</div>
+		<nav class="kb-footer-links kb-small" aria-label="Footer navigation">
+			<a href="/">WordPress plugin</a>
+			<a href="/tools/">Browser tools</a>
+			<a href="https://wordpress.org/plugins/kilobyte-image-optimizer/" target="_blank" rel="noopener noreferrer">WordPress.org listing</a>
+			<a href="https://wordpress.org/support/plugin/kilobyte-image-optimizer/" target="_blank" rel="noopener noreferrer">Support forum</a>
+			<a href="https://github.com/JosephGabito/kilobyte-image-optimizer" target="_blank" rel="noopener noreferrer">Source code on GitHub</a>
+			<a href="/THIRD-PARTY-LICENSES.txt">Third-party licenses</a>
+			<a href="https://joseph.gabi.to" target="_blank" rel="noopener noreferrer">Made by Joseph Gabito</a>
+		</nav>
+	</div>
+</footer>
+<dialog class="kb-dialog" id="kb-screen-dialog" aria-labelledby="kb-dialog-title">
+	<div class="kb-dialog-head">
+		<h2 class="kb-h3" id="kb-dialog-title">Screen preview</h2>
+		<button type="button" class="kb-btn kb-btn-ghost" id="kb-dialog-close" aria-label="Close preview"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13 11.8l6.1-6.3-1-1-6.1 6.2-6.1-6.2-1 1 6.1 6.3-6.5 6.7 1 1 6.5-6.6 6.5 6.6 1-1z"/></svg><span>Close</span></button>
+	</div>
+	<div class="kb-dialog-body">
+		<img id="kb-dialog-img" class="kb-modal-img" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" width="1" height="1" alt="" />
+		<p class="kb-small" id="kb-dialog-caption"></p>
+	</div>
+</dialog>
+	<script src="/dist/home.d6056c81.js" defer></script>
 </body>
 </html>
