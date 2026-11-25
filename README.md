@@ -4,6 +4,7 @@
 
 [![CI & Plugin Check](https://img.shields.io/github/actions/workflow/status/JosephGabito/kilobyte-image-optimizer/ci.yml?branch=main&style=flat-square&label=CI%20%26%20Plugin%20Check)](https://github.com/JosephGabito/kilobyte-image-optimizer/actions/workflows/ci.yml)
 [![WordPress.org](https://img.shields.io/wordpress/plugin/v/kilobyte-image-optimizer?style=flat-square&logo=wordpress&logoColor=white&label=WordPress.org)](https://wordpress.org/plugins/kilobyte-image-optimizer/)
+[![Try Live Preview](https://img.shields.io/badge/Live%20Preview-WordPress%20Playground-3858e9?style=flat-square&logo=wordpress&logoColor=white)](https://playground.wordpress.net/?blueprint-url=https://raw.githubusercontent.com/JosephGabito/kilobyte-image-optimizer/main/.wordpress-org/blueprints/blueprint.json)
 [![Tested up to WordPress](https://img.shields.io/wordpress/plugin/tested/kilobyte-image-optimizer?style=flat-square&label=WordPress)](https://wordpress.org/plugins/kilobyte-image-optimizer/)
 [![Required PHP](https://img.shields.io/wordpress/plugin/required-php/kilobyte-image-optimizer?style=flat-square&logo=php&logoColor=white&label=PHP)](https://wordpress.org/plugins/kilobyte-image-optimizer/)
 [![Downloads](https://img.shields.io/wordpress/plugin/dt/kilobyte-image-optimizer?style=flat-square&label=Downloads)](https://wordpress.org/plugins/kilobyte-image-optimizer/)
@@ -20,6 +21,41 @@ We care about your experience because we are WordPress users too. Kilobyte is de
 - **Calm admin experience:** Keeps your WordPress dashboard clean and focused on your media, with simple controls and every included setting ready to use.
 - **Native WordPress interface:** Built with `@wordpress/components` organized into four simple tabs (**Preview**, **Selective optimize**, **Bulk optimize**, **Preference**).
 - **Safe by default:** Leaves your original Media Library files and existing image URLs untouched, so you can test freely and restore anytime.
+
+## Screenshots
+
+<p align="center">
+  <img src=".wordpress-org/screenshot-1.jpg" alt="Live side-by-side Quality preview comparing Original and WebP output" width="100%" />
+  <br />
+  <sub><strong>Quality preview</strong> · Compare WebP, AVIF, or original output side by side in your browser before saving.</sub>
+</p>
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <img src=".wordpress-org/screenshot-2.jpg" alt="Selective optimize tab with chosen Media Library photos" width="100%" />
+      <br />
+      <sub><strong>Selective optimize</strong> · Pick specific Media Library photos without running a full bulk job.</sub>
+    </td>
+    <td width="50%" valign="top">
+      <img src=".wordpress-org/screenshot-5.jpg" alt="Media Library attachment details with untouched original and one-click restore" width="100%" />
+      <br />
+      <sub><strong>Media Library integration</strong> · Keeps your original file intact with savings and one-click restore right in the modal.</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img src=".wordpress-org/screenshot-3.jpg" alt="Bulk optimization summary with transfer savings and per-image breakdown" width="100%" />
+      <br />
+      <sub><strong>Bulk optimization</strong> · Track transfer savings, copy a summary, regenerate thumbnails, or restore all in one click.</sub>
+    </td>
+    <td width="50%" valign="top">
+      <img src=".wordpress-org/screenshot-4.jpg" alt="Preference tab with format, compression presets, quality slider, and resize controls" width="100%" />
+      <br />
+      <sub><strong>Preference &amp; fine-tuning</strong> · Native WordPress controls for format, compression, resize limits, auto alt text, and decoding hints.</sub>
+    </td>
+  </tr>
+</table>
 
 ## Key Features
 
