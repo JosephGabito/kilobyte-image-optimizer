@@ -215,6 +215,32 @@ final class WpRasterImage {
 	}
 
 	/**
+	 * Save an encoded image while keeping Kilobyte's quality across format changes.
+	 *
+	 * WordPress's WP_Image_Editor::get_output_format() resets quality to the new
+	 * format's default during save() whenever the output MIME differs from the input.
+	 *
+	 * @param \WP_Image_Editor $editor  Loaded image editor.
+	 * @param string           $path    Destination file path.
+	 * @param string           $mime    Target MIME type.
+	 * @param int              $quality Requested quality (1-100).
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	public static function save_with_quality( \WP_Image_Editor $editor, string $path, string $mime, int $quality ) {
+		$editor->set_quality( $quality );
+		$apply_quality = static fn (): int => $quality;
+		// Priority 9 replaces Core's format default while still allowing site filters at priority 10+.
+		add_filter( 'wp_editor_set_quality', $apply_quality, 9 );
+		add_filter( 'jpeg_quality', $apply_quality, 9 );
+		try {
+			return $editor->save( $path, $mime );
+		} finally {
+			remove_filter( 'wp_editor_set_quality', $apply_quality, 9 );
+			remove_filter( 'jpeg_quality', $apply_quality, 9 );
+		}
+	}
+
+	/**
 	 * Return formats that the site allows and can edit.
 	 *
 	 * @return string[]

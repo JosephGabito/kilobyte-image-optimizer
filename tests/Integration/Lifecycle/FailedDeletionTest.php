@@ -2,8 +2,8 @@
 /**
  * What happens to the rest of a request after WordPress fails to delete an image.
  *
- * Each test runs in its own PHP process. The bug these tests describe leaves locks held for
- * the rest of the process, which would otherwise break every test that runs after them.
+ * Each test runs in its own PHP process so a regression that leaves locks held
+ * cannot poison tests that run afterward.
  *
  * @package KilobyteImageOptimizer\Tests
  */
@@ -41,12 +41,6 @@ final class FailedDeletionTest extends LifecycleTestCase {
 		parent::tear_down_after_class();
 	}
 
-	/**
-	 * Known bug: the locks taken before deleting are only released by the `deleted_post` hook,
-	 * which WordPress skips when its delete query fails.
-	 *
-	 * @group known-bug
-	 */
 	public function test_a_failed_deletion_does_not_stop_the_next_image_from_being_deleted(): void {
 		$first  = $this->optimized_jpeg();
 		$second = $this->optimized_jpeg();
@@ -55,11 +49,6 @@ final class FailedDeletionTest extends LifecycleTestCase {
 		$this->assertNotFalse( wp_delete_attachment( $second, true ), 'The second image must still be deletable.' );
 	}
 
-	/**
-	 * Known bug: same cause. The stats lock is still held, so the next save fails.
-	 *
-	 * @group known-bug
-	 */
 	public function test_a_failed_deletion_does_not_stop_other_images_from_being_optimized(): void {
 		$this->fail_deleting_post_row( $this->optimized_jpeg() );
 		$next = $this->upload( Images::jpeg( 320, 240 ) );

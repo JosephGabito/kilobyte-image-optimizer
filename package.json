@@ -1,6 +1,6 @@
 {
 	"name": "kilobyte-image-optimizer",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"private": true,
 	"description": "WordPress native React admin UI and browser image compression for Kilobyte Image Optimizer.",
 	"scripts": {

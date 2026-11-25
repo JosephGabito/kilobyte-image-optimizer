@@ -597,13 +597,16 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 			}
 		}
 
+		$restored_relative = substr( $restored, strlen( $root ) );
+		$cleanup_files     = array_merge( array( $restored_relative ), $thumbnail_files );
+
 		global $wpdb;
 		if ( ! WpOperationLock::is_current() || ! WpOperationLock::guard_write( $wpdb->postmeta, static fn () => update_attached_file( $attachment_id, $restored ) ) ) {
-			WpVariantRetirement::schedule_removed_files( $thumbnail_files );
+			WpVariantRetirement::schedule_removed_files( $cleanup_files );
 			return null;
 		}
 		if ( ! WpOperationLock::is_current() ) {
-			WpVariantRetirement::schedule_removed_files( $thumbnail_files );
+			WpVariantRetirement::schedule_removed_files( $cleanup_files );
 			return new OperationFailure( OperationFailure::BUSY );
 		}
 
@@ -720,7 +723,6 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 					continue;
 				}
 			}
-			$editor->set_quality( $settings->quality() );
 			if ( null !== $deadline && microtime( true ) >= $deadline ) {
 				break;
 			}
@@ -728,7 +730,7 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 			if ( $filesystem->exists( $destination ) || is_link( $destination ) ) {
 				continue;
 			}
-			$saved  = $editor->save( $destination, $target_mime );
+			$saved  = WpRasterImage::save_with_quality( $editor, $destination, $target_mime, $settings->quality() );
 			$output = is_array( $saved ) ? ( $saved['path'] ?? '' ) : '';
 			if ( $output !== $destination ) {
 				if ( is_string( $output ) && pathinfo( $output, PATHINFO_FILENAME ) === pathinfo( $destination, PATHINFO_FILENAME )
@@ -894,7 +896,7 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 			if ( microtime( true ) >= $deadline ) {
 				return false;
 			}
-			if ( ! $this->is_owned_variant_path( $relative ) ) {
+			if ( ! $this->is_owned_variant_path( $relative ) && ! $this->is_owned_restored_path( $relative ) ) {
 				continue;
 			}
 			$file = $root . $relative;
@@ -1034,6 +1036,21 @@ final class WpAttachmentRepository implements AttachmentRepositoryInterface {
 		}
 		$owner = null === $attachment_id ? '(?:\d+-)?' : $attachment_id . '-';
 		return 1 === preg_match( '/\.kilobyte-' . $owner . '[a-f0-9-]{36}\.(?:jpe?g|png|gif|bmp|webp|avif)$/iD', $relative );
+	}
+
+	/**
+	 * Confirm a relative upload path matches a Kilobyte-generated legacy restore filename.
+	 *
+	 * @param mixed    $relative      Relative path under uploads.
+	 * @param int|null $attachment_id Require the marker to match a specific attachment.
+	 * @return bool
+	 */
+	private function is_owned_restored_path( $relative, ?int $attachment_id = null ): bool {
+		if ( ! is_string( $relative ) || validate_file( $relative ) || 0 === strpos( $relative, '/' ) ) {
+			return false;
+		}
+		$owner = null === $attachment_id ? '\d+-' : $attachment_id . '-';
+		return 1 === preg_match( '/(?:^|\/)kilobyte-restored-' . $owner . '[a-f0-9-]{36}(?:-\d+)?\.(?:jpe?g|png|gif|bmp|webp|avif)$/iD', $relative );
 	}
 
 	/**

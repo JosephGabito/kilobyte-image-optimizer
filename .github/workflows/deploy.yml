@@ -1,0 +1,186 @@
+name: Deploy to WordPress.org
+
+on:
+  release:
+    types: [ published ]
+  workflow_dispatch:
+    inputs:
+      deploy_assets_only:
+        description: 'Update WordPress.org banners, icons, and screenshots only (no version release)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wordpress-org-deploy
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Verify release
+    if: github.event_name == 'release' && !github.event.release.prerelease
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: kilobyte_tests
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -proot"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+
+    env:
+      WP_TESTS_DB_HOST: 127.0.0.1:3306
+      WP_VERSION: '7.1.5'
+
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify release version consistency
+        id: version
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          if [[ ! "$TAG" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Release tag '${GITHUB_REF_NAME}' must be semver (e.g. 1.0.1 or v1.0.1)."
+            exit 1
+          fi
+
+          PLUGIN_VERSION="$(sed -n 's/^[[:space:]]*\*[[:space:]]*Version:[[:space:]]*\([^[:space:]]*\).*/\1/p' kilobyte-image-optimizer.php | head -n 1)"
+          CONST_VERSION="$(sed -n "s/^define([[:space:]]*'KILOBYTE_IO_VERSION',[[:space:]]*'\([^']*\)'.*/\1/p" kilobyte-image-optimizer.php | head -n 1)"
+          README_VERSION="$(sed -n 's/^Stable tag:[[:space:]]*\([^[:space:]]*\).*/\1/p' readme.txt | head -n 1)"
+          PKG_VERSION="$(jq -r '.version' package.json)"
+
+          echo "Tag:          $TAG"
+          echo "Plugin header:$PLUGIN_VERSION"
+          echo "Constant:     $CONST_VERSION"
+          echo "readme.txt:   $README_VERSION"
+          echo "package.json: $PKG_VERSION"
+
+          if [[ "$TAG" != "$PLUGIN_VERSION" || "$TAG" != "$CONST_VERSION" || "$TAG" != "$README_VERSION" || "$TAG" != "$PKG_VERSION" ]]; then
+            echo "::error::Version mismatch across release tag, plugin header, KILOBYTE_IO_VERSION, readme.txt, and package.json."
+            exit 1
+          fi
+
+          echo "version=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: gd, mysqli
+          coverage: pcov
+          tools: composer:v2, wp-cli
+
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --prefer-dist
+
+      - name: Run PHPCS (VIP Go + WP Extra)
+        run: composer run lint -- --no-cache
+
+      - name: Download WordPress
+        run: wp core download --version="$WP_VERSION" --path=.cache/wordpress --skip-content
+
+      - name: Run PHPUnit with coverage
+        run: composer test:coverage
+
+      - name: Require 90% line coverage
+        run: php tests/bin/check-coverage.php .cache/coverage/clover.xml 90
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: TypeScript typecheck
+        run: npm run typecheck
+
+      - name: Build production assets
+        run: npm run build
+
+      - name: Stage release directory
+        run: |
+          mkdir -p dist/release
+          rsync -a --exclude-from=.distignore ./ dist/release/
+
+      - name: Run WordPress Plugin Check
+        uses: WordPress/plugin-check-action@v1
+        with:
+          build-dir: dist/release
+          slug: kilobyte-image-optimizer
+          categories: plugin_repo,security,performance
+
+  deploy:
+    name: Deploy plugin to WordPress.org
+    needs: verify
+    if: github.event_name == 'release' && !github.event.release.prerelease
+    runs-on: ubuntu-latest
+    environment: wordpress-org
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Build production assets
+        run: npm run build
+
+      - name: WordPress.org Plugin Deploy
+        id: deploy
+        uses: 10up/action-wordpress-plugin-deploy@stable
+        env:
+          SVN_USERNAME: ${{ secrets.SVN_USERNAME }}
+          SVN_PASSWORD: ${{ secrets.SVN_PASSWORD }}
+          SLUG: kilobyte-image-optimizer
+          VERSION: ${{ needs.verify.outputs.version }}
+          GENERATE_ZIP: true
+
+      - name: Attach release ZIP to GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ZIP_NAME="kilobyte-image-optimizer-${{ needs.verify.outputs.version }}.zip"
+          cp "${{ steps.deploy.outputs.zip-path }}" "$ZIP_NAME"
+          gh release upload "${{ github.event.release.tag_name }}" "$ZIP_NAME" --clobber
+
+  deploy-assets:
+    name: Update WordPress.org assets only
+    if: github.event_name == 'workflow_dispatch' && inputs.deploy_assets_only == true
+    runs-on: ubuntu-latest
+    environment: wordpress-org
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: WordPress.org Plugin Asset Update
+        uses: 10up/action-wordpress-plugin-asset-update@stable
+        env:
+          SVN_USERNAME: ${{ secrets.SVN_USERNAME }}
+          SVN_PASSWORD: ${{ secrets.SVN_PASSWORD }}
+          SLUG: kilobyte-image-optimizer

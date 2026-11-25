@@ -4,7 +4,7 @@ Tags: image-optimization, compress-images, optimize-images, webp, avif
 Requires at least: 6.6
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.0.0
+Stable tag: 1.0.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -18,14 +18,14 @@ Unlimited free image optimization. Compress, resize, and optimize images to WebP
 
 Large photos can slow page loads and increase how much mobile data visitors use. Smaller WebP or AVIF copies can reduce transfer size and help your site load faster. Preview the results on your own photos to find a balance between quality and file size.
 
-= Our Design Philosophy =
+= Our Philosophy =
 
 We care about your experience because we are WordPress users too. Kilobyte is designed to feel like a natural part of WordPress:
 
-* **Ready right after activation** with no account, API key, or monthly quota. Processing runs in your browser or with your WordPress site's built-in image editor.
-* **Calm admin experience** that keeps your dashboard focused on your media, with clean controls and no promotional banners or locked settings.
-* **Native WordPress interface** uses standard WordPress components on the optimization screen, with **Preview**, **Selective optimize**, **Bulk optimize**, and **Preference** tabs.
-* **Safe by default** means WordPress keeps your original Media Library files and existing image URLs. Restore switches delivery back to the original when WordPress can verify it.
+* **Ready right after activation.** Works right out of the box with no account, API key, or monthly quota. Processing runs in your browser or with your WordPress site's built-in image editor.
+* **Calm admin experience.** Keeps your WordPress dashboard clean and focused on your media, with simple controls and every included setting ready to use.
+* **Native WordPress interface.** Uses standard WordPress components on the optimization screen, with **Preview**, **Selective optimize**, **Bulk optimize**, and **Preference** tabs.
+* **Safe by default.** WordPress keeps your original Media Library files and existing image URLs. Restore switches delivery back to the original when WordPress can verify it.
 
 = Key Features =
 
@@ -104,6 +104,13 @@ Source code and issue tracking are hosted on [GitHub](https://github.com/JosephG
 The editable JavaScript and TypeScript are in `src-js/`. With Node.js 24.15 or later in the Node.js 24 series, run `npm ci` and `npm run build` from the plugin directory. The build writes the browser scripts and dependency manifests to `build/`.
 
 == Changelog ==
+
+= 1.0.1 =
+* Fixed server-side optimization and thumbnail generation ignoring the quality preference when converting formats.
+* Fixed Delete backups failing when legacy backup directories use numeric year or month names (such as `2024/01`).
+* Fixed failed legacy backup restores leaving behind an uncleaned full-size copy when `_wp_attached_file` cannot be saved.
+* Fixed failed attachment deletions holding image and stats locks for the rest of the request.
+* Fixed auto alt text keeping a trailing `1` when WordPress appends `-1` to filenames ending in dimensions or `-scaled`.
 
 = 1.0.0 =
 * Initial release with image previews, browser compression, server fallback, bulk optimization, restore, and thumbnail regeneration.

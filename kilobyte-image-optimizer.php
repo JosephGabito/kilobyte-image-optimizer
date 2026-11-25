@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       Kilobyte Image Optimizer
  * Description:       Compress images to WebP or AVIF, keep original media links, and regenerate thumbnails.
- * Version:           1.0.0
+ * Version:           1.0.1
  * Requires at least: 6.6
  * Requires PHP:      7.4
  * Author:            Joseph Gabito
@@ -20,7 +20,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'KILOBYTE_IO_VERSION', '1.0.0' );
+define( 'KILOBYTE_IO_VERSION', '1.0.1' );
 define( 'KILOBYTE_IO_FILE', __FILE__ );
 define( 'KILOBYTE_IO_DIR', plugin_dir_path( __FILE__ ) );
 define( 'KILOBYTE_IO_URL', plugin_dir_url( __FILE__ ) );
