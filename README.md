@@ -2,6 +2,14 @@
 
 # Kilobyte Image Optimizer
 
+[![CI & Plugin Check](https://img.shields.io/github/actions/workflow/status/JosephGabito/kilobyte-image-optimizer/ci.yml?branch=main&style=flat-square&label=CI%20%26%20Plugin%20Check)](https://github.com/JosephGabito/kilobyte-image-optimizer/actions/workflows/ci.yml)
+[![WordPress.org](https://img.shields.io/wordpress/plugin/v/kilobyte-image-optimizer?style=flat-square&logo=wordpress&logoColor=white&label=WordPress.org)](https://wordpress.org/plugins/kilobyte-image-optimizer/)
+[![Tested up to WordPress](https://img.shields.io/wordpress/plugin/tested/kilobyte-image-optimizer?style=flat-square&label=WordPress)](https://wordpress.org/plugins/kilobyte-image-optimizer/)
+[![Required PHP](https://img.shields.io/wordpress/plugin/required-php/kilobyte-image-optimizer?style=flat-square&logo=php&logoColor=white&label=PHP)](https://wordpress.org/plugins/kilobyte-image-optimizer/)
+[![Downloads](https://img.shields.io/wordpress/plugin/dt/kilobyte-image-optimizer?style=flat-square&label=Downloads)](https://wordpress.org/plugins/kilobyte-image-optimizer/)
+[![Coverage](https://img.shields.io/badge/coverage-95%25-brightgreen?style=flat-square)](https://github.com/JosephGabito/kilobyte-image-optimizer/actions/workflows/ci.yml)
+[![License](https://img.shields.io/github/license/JosephGabito/kilobyte-image-optimizer?style=flat-square&label=License)](LICENSE)
+
 Unlimited free image optimization for WordPress — compress, resize, and convert photos to **WebP** and **AVIF** in your browser or on your WordPress site, with no account, no API key, and no monthly credit limits.
 
 ## Our Philosophy

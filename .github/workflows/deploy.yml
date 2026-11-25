@@ -153,22 +153,24 @@ jobs:
         run: npm run build
 
       - name: WordPress.org Plugin Deploy
-        id: deploy
         uses: 10up/action-wordpress-plugin-deploy@stable
         env:
           SVN_USERNAME: ${{ secrets.SVN_USERNAME }}
           SVN_PASSWORD: ${{ secrets.SVN_PASSWORD }}
           SLUG: kilobyte-image-optimizer
           VERSION: ${{ needs.verify.outputs.version }}
-          GENERATE_ZIP: true
 
       - name: Attach release ZIP to GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           ZIP_NAME="kilobyte-image-optimizer-${{ needs.verify.outputs.version }}.zip"
-          cp "${{ steps.deploy.outputs.zip-path }}" "$ZIP_NAME"
+          STAGE="$(mktemp -d)"
+          mkdir -p "${STAGE}/kilobyte-image-optimizer"
+          rsync -a --exclude-from=.distignore ./ "${STAGE}/kilobyte-image-optimizer/"
+          (cd "$STAGE" && zip -rq "${GITHUB_WORKSPACE}/${ZIP_NAME}" kilobyte-image-optimizer)
           gh release upload "${{ github.event.release.tag_name }}" "$ZIP_NAME" --clobber
+          rm -rf "$STAGE" "$ZIP_NAME"
 
   deploy-assets:
     name: Update WordPress.org assets only
