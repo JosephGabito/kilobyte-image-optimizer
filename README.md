@@ -4,12 +4,12 @@
 
 Unlimited free image optimization for WordPress — compress, resize, and convert photos to **WebP** and **AVIF** in your browser or on your WordPress site, with no account, no API key, and no monthly credit limits.
 
-## Design Philosophy
+## Our Philosophy
 
 We care about your experience because we are WordPress users too. Kilobyte is designed to feel like a natural part of WordPress:
 
-- **Ready right after activation:** Works without an account, API key, or monthly quota. Processing runs in your browser or with your WordPress site's built-in image editor.
-- **Calm admin experience:** Keeps your dashboard focused on your media, with clean controls and no promotional banners or locked settings.
+- **Ready right after activation:** Works right out of the box with no account, API key, or monthly quota. Processing runs in your browser or with your WordPress site's built-in image editor.
+- **Calm admin experience:** Keeps your WordPress dashboard clean and focused on your media, with simple controls and every included setting ready to use.
 - **Native WordPress interface:** Built with `@wordpress/components` organized into four simple tabs (**Preview**, **Selective optimize**, **Bulk optimize**, **Preference**).
 - **Safe by default:** Leaves your original Media Library files and existing image URLs untouched, so you can test freely and restore anytime.
 

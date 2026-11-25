@@ -18,8 +18,6 @@ final class ServerEncodeTest extends OptimizeTestCase {
 	public function test_a_still_gif_gets_a_webp_copy_for_the_original_and_its_thumbnails(): void {
 		$this->use_settings( array( 'quality' => 60 ) );
 		$id = $this->upload( Images::still_gif( 320, 240 ) );
-		// WordPress applies its own default quality when the format changes. See report.
-		add_filter( 'wp_editor_set_quality', static fn (): int => 60 );
 
 		$result = $this->assertRestOk( $this->optimize_on_server( $id ) );
 
@@ -56,7 +54,6 @@ final class ServerEncodeTest extends OptimizeTestCase {
 	public function test_a_png_gets_a_smaller_webp_copy(): void {
 		$this->use_settings( array( 'quality' => 60 ) );
 		$id = $this->upload( Images::png( 320, 240 ) );
-		add_filter( 'wp_editor_set_quality', static fn (): int => 60 );
 
 		$result = $this->assertRestOk( $this->optimize_on_server( $id ) );
 
@@ -131,6 +128,7 @@ final class ServerEncodeTest extends OptimizeTestCase {
 
 	public function test_a_bmp_cannot_be_encoded_on_a_server_whose_editor_cannot_read_bmp(): void {
 		$id = $this->upload( $this->bmp() );
+		add_filter( 'wp_image_editors', static fn (): array => array( 'WP_Image_Editor_GD' ) );
 
 		$this->assertRestFailure( 'encode_failed', 422, $this->optimize_on_server( $id ) );
 		$this->assertSame( array(), $this->copies_next_to( $id ) );
@@ -304,11 +302,6 @@ final class ServerEncodeTest extends OptimizeTestCase {
 		$this->assertRestFailure( 'locked', 409, $this->rest( 'POST', "/optimize-server/{$id}", array( 'retry_upload' => true ) ) );
 	}
 
-	/**
-	 * Known bug: WordPress resets the quality when it saves in a new format, so the preference is lost.
-	 *
-	 * @group known-bug
-	 */
 	public function test_a_lower_quality_preference_makes_a_smaller_server_copy(): void {
 		$this->use_settings( array( 'quality' => 95 ) );
 		$high = $this->assertRestOk( $this->optimize_on_server( $this->upload( Images::jpeg() ) ) );
@@ -318,16 +311,21 @@ final class ServerEncodeTest extends OptimizeTestCase {
 		$this->assertLessThan( $high['optimized_size'], $low['optimized_size'], 'Quality 40 must give a smaller WebP copy than quality 95.' );
 	}
 
-	/**
-	 * Known bug: the thumbnail copies lose the quality preference the same way.
-	 *
-	 * @group known-bug
-	 */
 	public function test_a_lower_quality_preference_makes_smaller_thumbnail_copies(): void {
-		$this->use_settings( array( 'quality' => 95 ) );
+		$this->use_settings(
+			array(
+				'quality'      => 95,
+				'skip_smaller' => false,
+			)
+		);
 		$high = $this->upload( Images::jpeg() );
 		$this->assertRestOk( $this->optimize_on_server( $high ) );
-		$this->use_settings( array( 'quality' => 40 ) );
+		$this->use_settings(
+			array(
+				'quality'      => 40,
+				'skip_smaller' => false,
+			)
+		);
 		$low = $this->upload( Images::jpeg() );
 		$this->assertRestOk( $this->optimize_on_server( $low ) );
 

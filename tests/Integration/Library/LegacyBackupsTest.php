@@ -332,12 +332,6 @@ final class LegacyBackupsTest extends LibraryTestCase {
 		$this->links[] = $link;
 	}
 
-	/**
-	 * Known bug: folder names made only of digits come back from the directory listing as
-	 * numbers, which the folder check rejects, so Delete backups fails with purge_failed.
-	 *
-	 * @group known-bug
-	 */
 	public function test_delete_backups_succeeds_when_only_empty_year_and_month_folders_remain(): void {
 		$id     = $this->upload( Images::jpeg() );
 		$backup = $this->put_legacy_backup( Images::jpeg(), '2024/01/photo.jpg' );
@@ -349,12 +343,6 @@ final class LegacyBackupsTest extends LibraryTestCase {
 		$this->assertTrue( $this->assertRestOk( $this->rest( 'POST', '/backups/purge' ) )['purged'] );
 	}
 
-	/**
-	 * Known bug: same cause, and the site owner gets "could not clear" instead of being told
-	 * that originals remain.
-	 *
-	 * @group known-bug
-	 */
 	public function test_delete_backups_is_refused_while_a_year_folder_still_holds_an_original(): void {
 		$this->put_legacy_backup( Images::jpeg(), '2024/01/photo.jpg' );
 

@@ -78,14 +78,13 @@ final class WpImageEditorCompressor implements ServerCompressorInterface {
 			}
 		}
 
-		$editor->set_quality( $settings->quality() );
 		require_once ABSPATH . 'wp-admin/includes/file.php';
 		$tmp_file = wp_tempnam( 'kilobyte-image' );
 		if ( ! is_string( $tmp_file ) || '' === $tmp_file ) {
 			return array( 'error' => __( 'The server could not prepare the optimized image.', 'kilobyte-image-optimizer' ) );
 		}
 
-		$saved = $editor->save( $tmp_file, $mime );
+		$saved = WpRasterImage::save_with_quality( $editor, $tmp_file, $mime, $settings->quality() );
 		$path  = is_array( $saved ) ? (string) ( $saved['path'] ?? '' ) : '';
 		if ( $tmp_file !== $path ) {
 			wp_delete_file( $tmp_file );

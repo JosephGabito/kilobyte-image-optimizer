@@ -215,12 +215,6 @@ final class RestoreLegacyBackupTest extends LifecycleTestCase {
 		$this->assertSame( $image['current'], get_attached_file( $image['id'] ) );
 	}
 
-	/**
-	 * Known bug: only the new thumbnails are queued for cleanup. The full-size copy of the
-	 * backup stays, and its name is not one the cleanup recognises.
-	 *
-	 * @group known-bug
-	 */
 	public function test_a_restore_that_cannot_save_the_file_path_leaves_no_copy_of_the_backup_behind(): void {
 		$this->skip_on_multisite();
 		$image = $this->image_compressed_in_place( Images::jpeg( 320, 240 ) );

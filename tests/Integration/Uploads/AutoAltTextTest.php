@@ -88,12 +88,6 @@ final class AutoAltTextTest extends UploadTestCase {
 		return html_entity_decode( $match[1] );
 	}
 
-	/**
-	 * Known bug: WordPress renames a file whose name ends in a size by adding "-1", and the
-	 * "1" ends up in the alt text.
-	 *
-	 * @group known-bug
-	 */
 	public function test_a_file_name_ending_in_a_size_gives_alt_text_without_a_number(): void {
 		$this->set_preferences( array( 'auto_alt_text' => true ) );
 
@@ -102,11 +96,6 @@ final class AutoAltTextTest extends UploadTestCase {
 		$this->assertSame( 'Summer picnic', $this->alt_text_on_page( $id ) );
 	}
 
-	/**
-	 * Known bug: same cause, so a name made only of size words gets the alt text "1".
-	 *
-	 * @group known-bug
-	 */
 	public function test_a_file_name_made_only_of_a_size_and_scaled_gives_no_alt_text(): void {
 		$this->set_preferences( array( 'auto_alt_text' => true ) );
 

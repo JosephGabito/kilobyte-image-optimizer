@@ -69,8 +69,9 @@ final class WpFilesystemBackupStorage implements BackupStorageInterface {
 		if ( ! is_array( $entries ) ) {
 			return null;
 		}
-		foreach ( $entries as $name => $entry ) {
-			if ( ! is_string( $name ) || wp_basename( $name ) !== $name || validate_file( $name ) ) {
+		foreach ( $entries as $key => $entry ) {
+			$name = is_array( $entry ) && is_string( $entry['name'] ?? null ) ? $entry['name'] : ( is_int( $key ) ? (string) $key : $key );
+			if ( ! is_string( $name ) || '' === $name || wp_basename( $name ) !== $name || validate_file( $name ) ) {
 				return null;
 			}
 			$file = $dir . '/' . $name;

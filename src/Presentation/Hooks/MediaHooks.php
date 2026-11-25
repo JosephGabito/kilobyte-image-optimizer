@@ -48,6 +48,9 @@ final class MediaHooks {
 	/** @var array<string, array<string, mixed>> */
 	private array $pending_deletions = array();
 
+	/** @var array<string, bool> */
+	private array $notifiable_deletions = array();
+
 	/**
 	 * Background upload optimization.
 	 *
@@ -154,6 +157,7 @@ final class MediaHooks {
 		add_action( 'added_post_meta', array( $this, 'maybe_reset_image_check' ), 10, 3 );
 		add_action( 'updated_post_meta', array( $this, 'maybe_reset_image_check' ), 10, 3 );
 		add_filter( 'pre_delete_attachment', array( $this, 'before_delete_attachment' ), PHP_INT_MAX, 2 );
+		add_action( 'delete_post', array( $this, 'finish_delete_attachment' ), PHP_INT_MAX, 1 );
 		add_action( 'deleted_post', array( $this, 'after_delete_attachment' ), 10, 2 );
 		add_filter( 'wp_generate_attachment_metadata', array( $this, 'maybe_server_fallback_on_upload' ), 20, 3 );
 		add_filter( 'manage_media_columns', array( $this, 'add_media_column' ) );
@@ -271,6 +275,7 @@ final class MediaHooks {
 			return false;
 		}
 
+		unset( $this->notifiable_deletions[ $key ] );
 		$this->pending_deletions[ $key ] = array(
 			'finish'  => $finish_record,
 			'release' => $release,
@@ -279,13 +284,15 @@ final class MediaHooks {
 	}
 
 	/**
-	 * Remove plugin files only after core confirms the post was deleted.
+	 * Commit counter updates and release deletion locks after Core removes attachment metadata.
 	 *
-	 * @param int      $id   Post ID.
-	 * @param \WP_Post $post Deleted post.
+	 * WordPress skips deleted_post when deleting the post row fails, so holding locks past
+	 * delete_post would leak them for the rest of the request.
+	 *
+	 * @param int $id Post ID.
 	 * @return void
 	 */
-	public function after_delete_attachment( int $id, \WP_Post $post ): void {
+	public function finish_delete_attachment( int $id ): void {
 		$key     = get_current_blog_id() . ':' . $id;
 		$pending = $this->pending_deletions[ $key ] ?? null;
 		if ( null === $pending ) {
@@ -293,15 +300,35 @@ final class MediaHooks {
 		}
 
 		unset( $this->pending_deletions[ $key ] );
+		$this->notifiable_deletions[ $key ] = true;
 		try {
 			if ( null !== $pending['finish'] ) {
 				$pending['finish']();
 			}
-			clean_post_cache( $post );
-			$this->events->variant_changed( $id );
 		} finally {
 			$pending['release']();
 		}
+	}
+
+	/**
+	 * Notify cache integrations only after Core confirms the post row was deleted.
+	 *
+	 * @param int      $id   Post ID.
+	 * @param \WP_Post $post Deleted post.
+	 * @return void
+	 */
+	public function after_delete_attachment( int $id, \WP_Post $post ): void {
+		$key = get_current_blog_id() . ':' . $id;
+		if ( isset( $this->pending_deletions[ $key ] ) ) {
+			$this->finish_delete_attachment( $id );
+		}
+		if ( empty( $this->notifiable_deletions[ $key ] ) ) {
+			return;
+		}
+
+		unset( $this->notifiable_deletions[ $key ] );
+		clean_post_cache( $post );
+		$this->events->variant_changed( $id );
 	}
 
 	/**
