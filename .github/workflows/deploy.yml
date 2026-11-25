@@ -90,7 +90,9 @@ jobs:
         run: composer run lint -- --no-cache
 
       - name: Download WordPress
-        run: wp core download --version="$WP_VERSION" --path=.cache/wordpress --skip-content
+        run: |
+          mkdir -p .cache/wordpress
+          wp core download --version="$WP_VERSION" --path=.cache/wordpress --skip-content
 
       - name: Run PHPUnit with coverage
         run: composer test:coverage

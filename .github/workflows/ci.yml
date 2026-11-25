@@ -58,7 +58,9 @@ jobs:
         run: composer install --no-interaction --prefer-dist
 
       - name: Download WordPress
-        run: wp core download --version="$WP_VERSION" --path=.cache/wordpress --skip-content
+        run: |
+          mkdir -p .cache/wordpress
+          wp core download --version="$WP_VERSION" --path=.cache/wordpress --skip-content
 
       - name: Run tests
         if: matrix.coverage == 'none'
