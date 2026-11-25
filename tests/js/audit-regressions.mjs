@@ -438,11 +438,12 @@ try {
 
 			const orientedOutBuf = Buffer.from( orientedDownload.rawBytes );
 			const orientedChunks = parsePngChunks( orientedOutBuf );
+			const orientedIhdr = orientedChunks.find( ( c ) => c.type === 'IHDR' )?.data;
+			assert.equal( orientedIhdr.readUInt32BE( 0 ), 8, `${ eng.name }: Output IHDR width must be physically rotated to 8` );
+			assert.equal( orientedIhdr.readUInt32BE( 4 ), 16, `${ eng.name }: Output IHDR height must be physically rotated to 16` );
 			assert.ok( orientedChunks.some( ( c ) => c.type === 'iCCP' ), `${ eng.name }: iCCP chunk must stay intact` );
 			assert.equal( orientedChunks.some( ( c ) => c.type === 'tEXt' ), false, `${ eng.name }: tEXt chunk must be stripped` );
-			const outExif = orientedChunks.find( ( c ) => c.type === 'eXIf' );
-			assert.ok( outExif, `${ eng.name }: Minimal orientation-only eXIf chunk must be preserved` );
-			assert.equal( outExif.data.length, 26, `${ eng.name }: Sanitized eXIf chunk must be 26 bytes (orientation only), got ${ outExif.data.length }` );
+			assert.equal( orientedChunks.some( ( c ) => c.type === 'eXIf' ), false, `${ eng.name }: eXIf chunk must be completely stripped after lossless pixel rotation` );
 			assert.equal( orientedOutBuf.includes( Buffer.from( 'SecretCameraModel' ) ), false, `${ eng.name }: Private EXIF Make must be stripped` );
 			assert.equal( orientedOutBuf.includes( Buffer.from( 'PrivateAuthorName' ) ), false, `${ eng.name }: Private EXIF Artist must be stripped` );
 			assert.equal( orientedOutBuf.includes( Buffer.from( 'SecretPngTextAuthor' ) ), false, `${ eng.name }: Private tEXt must be stripped` );
@@ -519,9 +520,11 @@ try {
 		} ) );
 		const oriented16Chunks = parsePngChunks( oriented16Buf );
 		const oriented16Ihdr = oriented16Chunks.find( ( c ) => c.type === 'IHDR' )?.data;
+		assert.equal( oriented16Ihdr.readUInt32BE( 0 ), 8, 'F02C: 16-bit EXIF-rotated PNG IHDR width must be physically rotated to 8' );
+		assert.equal( oriented16Ihdr.readUInt32BE( 4 ), 16, 'F02C: 16-bit EXIF-rotated PNG IHDR height must be physically rotated to 16' );
 		assert.equal( oriented16Ihdr[ 8 ], 16, 'F02C: 16-bit EXIF-rotated lossless PNG must stay 16-bit' );
 		assert.ok( oriented16Chunks.some( ( c ) => c.type === 'iCCP' ), 'F02C: 16-bit EXIF-rotated lossless PNG must keep iCCP' );
-		assert.equal( oriented16Chunks.find( ( c ) => c.type === 'eXIf' )?.data.length, 26, 'F02C: 16-bit EXIF-rotated PNG must keep 26-byte orientation-only eXIf' );
+		assert.equal( oriented16Chunks.some( ( c ) => c.type === 'eXIf' ), false, 'F02C: 16-bit EXIF-rotated PNG must strip eXIf completely after pixel rotation' );
 		assert.equal( oriented16Buf.includes( Buffer.from( 'SecretCameraModel' ) ), false, 'F02C: Private EXIF Make must be stripped' );
 		assert.match( await page.locator( '[data-role="opt-meta"]' ).textContent(), /8\s*×\s*16\s*px/, 'F02C: Reported dims must match upright 8x16' );
 

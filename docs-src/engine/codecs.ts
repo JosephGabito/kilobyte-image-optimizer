@@ -1,6 +1,7 @@
 import { verifyFileSignature, verifyPngComplete } from '../../src-js/core/format';
 import { parseTiffOrientation } from '../../src-js/core/rasterHeader';
 import type { PngOptimizationMode } from '../../src-js/core/types';
+import { transformLosslessPngOrientation } from './pngOrientation';
 import type { ToolProcessStage } from './types';
 
 type OxipngExports = {
@@ -146,69 +147,6 @@ function paletteSizeForQuality( quality: number ): number {
 	return 256;
 }
 
-function pngChunkCrc32( data: Uint8Array ): number {
-	let crc = 0xffffffff;
-	for ( let i = 0; i < data.length; i++ ) {
-		crc ^= data[ i ];
-		for ( let bit = 0; bit < 8; bit++ ) {
-			crc = ( crc >>> 1 ) ^ ( crc & 1 ? 0xedb88320 : 0 );
-		}
-	}
-	return ( crc ^ 0xffffffff ) >>> 0;
-}
-
-/**
- * Build a minimal 38-byte PNG `eXIf` chunk containing ONLY the single TIFF IFD0
- * Orientation tag (0x0112 = 2..8). Zero camera, GPS, author, date, or thumbnail data.
- */
-function buildMinimalOrientationExifChunk( orientation: number ): Uint8Array {
-	const payload = new Uint8Array( [
-		0x4d, 0x4d, 0x00, 0x2a, 0x00, 0x00, 0x00, 0x08, // Big-endian TIFF, magic 42, IFD0 @ 8
-		0x00, 0x01, // 1 IFD0 entry
-		0x01, 0x12, 0x00, 0x03, 0x00, 0x00, 0x00, 0x01, 0x00, orientation & 0xff, 0x00, 0x00, // Orientation
-		0x00, 0x00, 0x00, 0x00, // Next IFD = 0
-	] );
-	const chunk = new Uint8Array( 12 + payload.length );
-	const view = new DataView( chunk.buffer );
-	view.setUint32( 0, payload.length );
-	chunk[ 4 ] = 0x65; // 'e'
-	chunk[ 5 ] = 0x58; // 'X'
-	chunk[ 6 ] = 0x49; // 'I'
-	chunk[ 7 ] = 0x66; // 'f'
-	chunk.set( payload, 8 );
-	view.setUint32( 8 + payload.length, pngChunkCrc32( chunk.subarray( 4, 8 + payload.length ) ) );
-	return chunk;
-}
-
-/** Insert a sanitized orientation-only `eXIf` chunk immediately before the first `IDAT` chunk. */
-function injectOrientationExifChunk( pngBytes: Uint8Array, orientation: number ): Uint8Array {
-	const view = new DataView( pngBytes.buffer, pngBytes.byteOffset, pngBytes.byteLength );
-	let offset = 8;
-	let insertAt = -1;
-	while ( offset + 12 <= pngBytes.length ) {
-		const chunkLen = view.getUint32( offset );
-		const end = offset + 12 + chunkLen;
-		if ( chunkLen > 0x7fffffff || end > pngBytes.length ) {
-			throw new Error( 'png_structure_unreadable' );
-		}
-		const type = String.fromCharCode( ...pngBytes.subarray( offset + 4, offset + 8 ) );
-		if ( type === 'IDAT' ) {
-			insertAt = offset;
-			break;
-		}
-		offset = end;
-	}
-	if ( insertAt < 0 ) {
-		throw new Error( 'png_structure_unreadable' );
-	}
-	const exifChunk = buildMinimalOrientationExifChunk( orientation );
-	const merged = new Uint8Array( pngBytes.length + exifChunk.length );
-	merged.set( pngBytes.subarray( 0, insertAt ), 0 );
-	merged.set( exifChunk, insertAt );
-	merged.set( pngBytes.subarray( insertAt ), insertAt + exifChunk.length );
-	return merged;
-}
-
 function stripNonColorPngMetadata( bytes: Uint8Array ): { bytes: Uint8Array; orientation: number } {
 	if ( bytes.length < 33 || ! verifyFileSignature( bytes, 'image/png' ) ) {
 		throw new Error( 'png_structure_unreadable' );
@@ -255,9 +193,10 @@ function stripNonColorPngMetadata( bytes: Uint8Array ): { bytes: Uint8Array; ori
 /**
  * Bit-exact PNG-to-PNG lossless optimizer. Bypasses Canvas completely so
  * semi-transparent RGBA samples, 16-bit bit depth, and ICC profiles stay intact
- * while stripping private metadata (GPS, camera, author, text, timestamps).
- * When the input carries a non-identity EXIF Orientation (2..8), a sanitized
- * orientation-only `eXIf` chunk is emitted so displayed orientation stays upright.
+ * while stripping all private metadata (eXIf, tEXt, iTXt, zTXt, tIME).
+ * When the input carries EXIF Orientation 2..8, the pixel matrix is losslessly
+ * oriented into upright pixel order before oxipng packing so every browser and
+ * viewer displays the exact upright image without relying on PNG eXIf support.
  */
 export async function encodeLosslessPngBytes(
 	originalPngBytes: Uint8Array,
@@ -265,17 +204,17 @@ export async function encodeLosslessPngBytes(
 	onStage?: ( stage: ToolProcessStage ) => void
 ): Promise< { blob: Blob; encoder: 'oxipng' } > {
 	const { bytes: filtered, orientation } = stripNonColorPngMetadata( originalPngBytes );
+	const oriented = orientation >= 2 && orientation <= 8
+		? await transformLosslessPngOrientation( filtered, orientation )
+		: filtered;
 	const oxipng = await loadOxipng( codecBaseUrl, onStage );
 	onStage?.( 'encoding' );
 	let out: Uint8Array;
 	try {
 		// optimiseAlpha = false preserves exact RGB samples even under alpha=0/semi-alpha.
-		out = oxipng.optimise( filtered, 2, false, false );
+		out = oxipng.optimise( oriented, 2, false, false );
 	} catch {
 		throw new Error( 'png_structure_unreadable' );
-	}
-	if ( orientation >= 2 && orientation <= 8 ) {
-		out = injectOrientationExifChunk( out, orientation );
 	}
 	if ( ! verifyPngComplete( out ) ) {
 		throw new Error( 'unsupported_output_format' );

@@ -1,5 +1,6 @@
 declare module '*.css';
 declare module 'upng-js';
+declare module 'pako';
 declare module '@jsquash/oxipng/codec/pkg/squoosh_oxipng.js';
 declare module '@jsquash/webp/codec/enc/webp_enc.js';
 declare module '@jsquash/avif/codec/enc/avif_enc.js';
