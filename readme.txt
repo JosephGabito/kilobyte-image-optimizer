@@ -12,7 +12,7 @@ Unlimited free WebP & AVIF optimization in your browser or on site. Keeps origin
 
 == Description ==
 
-**Kilobyte Image Optimizer** makes smaller **[WebP](https://developers.google.com/speed/webp)** and **[AVIF](https://developer.mozilla.org/en-US/docs/Web/Media/Guides/Formats/Image_types#avif_image)** copies of your WordPress images while *keeping your original Media Library files and existing links untouched*. **Preview the result on one photo** before optimizing your library. Processing runs right in your browser or on your WordPress site with *no account, no API key, and no monthly quota*.
+**Kilobyte Image Optimizer** makes smaller **[WebP](https://developers.google.com/speed/webp)** and **[AVIF](https://developer.mozilla.org/en-US/docs/Web/Media/Guides/Formats/Image_types#avif_image)** copies of your WordPress images while *keeping your original Media Library files and existing links untouched*. **Preview the result on one photo** before optimizing your library, or try the interactive browser demo at [kilobyte.gabi.to](https://kilobyte.gabi.to/). Processing runs right in your browser or on your WordPress site with *no account, no API key, and no monthly quota*.
 
 Kilobyte also ships with native **[WordPress Abilities API](https://developer.wordpress.org/apis/abilities-api/)** support *(WordPress 6.9+)*.
 

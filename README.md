@@ -11,7 +11,7 @@
 [![Downloads](https://img.shields.io/wordpress/plugin/dt/kilobyte-image-optimizer?style=flat-square&label=Downloads)](https://wordpress.org/plugins/kilobyte-image-optimizer/)
 [![License](https://img.shields.io/github/license/JosephGabito/kilobyte-image-optimizer?style=flat-square&label=License)](LICENSE)
 
-Make smaller **[WebP](https://developers.google.com/speed/webp)** and **[AVIF](https://developer.mozilla.org/en-US/docs/Web/Media/Guides/Formats/Image_types#avif_image)** copies of your WordPress images while *keeping your original Media Library files and existing URLs untouched*. **Preview the result on one photo** in your browser before optimizing your library. Unlimited and free, with *no account, API key, or monthly credit limits*.
+Make smaller **[WebP](https://developers.google.com/speed/webp)** and **[AVIF](https://developer.mozilla.org/en-US/docs/Web/Media/Guides/Formats/Image_types#avif_image)** copies of your WordPress images while *keeping your original Media Library files and existing URLs untouched*. **Preview the result on one photo** in your browser before optimizing your library, or try the interactive demo at **[kilobyte.gabi.to](https://kilobyte.gabi.to/)**. Unlimited and free, with *no account, API key, or monthly credit limits*.
 
 Kilobyte also ships with native **[WordPress Abilities API](https://developer.wordpress.org/apis/abilities-api/)** support *(WordPress 6.9+)*.
 

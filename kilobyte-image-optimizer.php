@@ -1,6 +1,7 @@
 <?php
 /**
  * Plugin Name:       Kilobyte Image Optimizer
+ * Plugin URI:        https://kilobyte.gabi.to/
  * Description:       Unlimited free WebP and AVIF image optimization that keeps original files and links intact, with WordPress Abilities for AI agents.
  * Version:           1.1.0
  * Requires at least: 6.6
