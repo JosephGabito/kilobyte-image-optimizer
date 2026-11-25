@@ -28,7 +28,7 @@
 	<link rel="preload" as="font" href="/assets/fonts/eb-garamond-latin-wght-normal.woff2" type="font/woff2" crossorigin />
 	<link rel="preload" as="font" href="/assets/fonts/inter-latin-wght-normal.woff2" type="font/woff2" crossorigin />
 	<link rel="preload" as="image" href="/assets/banner-1544x500.webp" type="image/webp" />
-	<link rel="stylesheet" href="/dist/site.f3bf5b37.css" />
+	<link rel="stylesheet" href="/dist/site.d4733807.css" />
 	<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","@id":"https://kilobyte.gabi.to/#website","name":"Kilobyte","url":"https://kilobyte.gabi.to/","description":"Free, browser-powered WebP, AVIF, JPEG, and PNG image optimization utilities and WordPress plugin.","publisher":{"@type":"Person","@id":"https://kilobyte.gabi.to/#author","name":"Joseph Gabito","url":"https://joseph.gabi.to"}}</script>
 	<script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","@id":"https://kilobyte.gabi.to/#software","name":"Kilobyte Image Optimizer","description":"Free WordPress plugin and local browser tools to shrink images to WebP and AVIF. Keeps original Media Library files untouched with zero quotas or uploads.","softwareVersion":"1.1.0","applicationCategory":"MultimediaApplication","operatingSystem":"WordPress 6.6+, Web","url":"https://kilobyte.gabi.to/","installUrl":"https://wordpress.org/plugins/kilobyte-image-optimizer/","image":"https://kilobyte.gabi.to/assets/og-card-1200x630.jpg","sameAs":["https://wordpress.org/plugins/kilobyte-image-optimizer/","https://github.com/JosephGabito/kilobyte-image-optimizer"],"author":{"@type":"Person","@id":"https://kilobyte.gabi.to/#author","name":"Joseph Gabito","url":"https://joseph.gabi.to"},"isAccessibleForFree":true,"license":"https://www.gnu.org/licenses/gpl-2.0.html","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}}</script>
 	<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Is Kilobyte really free and unlimited?","acceptedAnswer":{"@type":"Answer","text":"Yes. Kilobyte is free, has no limits, and needs no account. Images are compressed in your own browser, or by your WordPress site’s image editor, so there are no compression servers for anyone to pay for."}},{"@type":"Question","name":"Will it overwrite my original photos or break cached pages?","acceptedAnswer":{"@type":"Answer","text":"No. Kilobyte keeps your original files and their links, and saves each smaller WebP or AVIF image as a separate copy. Browsers that cannot show the copy get the original. If you restore an image, the old copies stay available for at least 24 hours, so cached pages keep working. If your page cache keeps pages for longer than a day, clear the affected pages after you restore."}},{"@type":"Question","name":"What happens to animated GIFs, APNGs, and animated WebPs?","acceptedAnswer":{"@type":"Answer","text":"Kilobyte checks each image before it compresses anything. Animated GIFs, APNGs, and animated WebPs are left exactly as they are, so the animation keeps working. Still GIFs can get smaller WebP or AVIF copies."}},{"@type":"Question","name":"What does my site need to run Kilobyte?","acceptedAnswer":{"@type":"Answer","text":"WordPress 6.6 or newer and PHP 7.4 or newer. Your host also needs GD or Imagick, the standard WordPress image editors, which almost every host has. Kilobyte does not need exec() or any extra server software."}},{"@type":"Question","name":"Can an AI assistant use Kilobyte?","acceptedAnswer":{"@type":"Answer","text":"Yes. On WordPress 6.9 and newer, Kilobyte registers seven abilities through the WordPress Abilities API. An AI assistant or MCP adapter connected to your site can read savings, list the images still waiting, optimize or restore an image, regenerate thumbnails, and change settings. WordPress checks the user’s permissions on every call."}}]}</script>
@@ -78,6 +78,12 @@
 					<a class="kb-btn kb-btn-secondary kb-btn-lg" href="https://playground.wordpress.net/?blueprint-url=https://raw.githubusercontent.com/JosephGabito/kilobyte-image-optimizer/main/.wordpress-org/blueprints/blueprint.json" target="_blank" rel="noopener noreferrer"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M19.5 4.5h-7V6h4.44l-5.97 5.97 1.06 1.06L18 7.06v4.44h1.5v-7Zm-13 1a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3H17v3a.5.5 0 0 1-.5.5h-10a.5.5 0 0 1-.5-.5v-10a.5.5 0 0 1 .5-.5h3V5.5h-3Z"/></svg><span>Try it in a demo site</span></a>
 				</div>
 				<p class="kb-small">The demo site is a real WordPress site that runs in your browser, with Kilobyte and 3 sample images already set up.</p>
+				<div class="kb-hero-alt">
+					<a class="kb-hero-alt-trigger" href="/tools/" id="kb-open-tools-modal" aria-haspopup="dialog" aria-controls="kb-tools-dialog">
+						<span class="kb-hero-alt-eyebrow">Not on WordPress?</span>
+						<span class="kb-hero-alt-action">Use our free browser image tools <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13.5 6l-1.1 1.1 4.1 4.1H4v1.5h12.5l-4.1 4.1 1.1 1.1 6-6-6-6z"/></svg></span>
+					</a>
+				</div>
 			</div>
 		</div>
 
@@ -596,6 +602,127 @@ add_action(
 		<p class="kb-small" id="kb-dialog-caption"></p>
 	</div>
 </dialog>
-	<script src="/dist/home.a95df8e6.js" defer></script>
+<dialog class="kb-dialog kb-tools-dialog" id="kb-tools-dialog" aria-labelledby="kb-tools-dialog-title" aria-describedby="kb-tools-dialog-desc">
+	<div class="kb-dialog-head kb-tools-dialog-head">
+		<div class="kb-tools-dialog-intro">
+			<p class="kb-kicker">Browser utilities · 100% local</p>
+			<h2 class="kb-tools-dialog-title" id="kb-tools-dialog-title">What would you like to do?</h2>
+			<p class="kb-small" id="kb-tools-dialog-desc">Every tool runs locally in your browser — no uploads, no account, and no file limits.</p>
+		</div>
+		<button type="button" class="kb-btn kb-btn-ghost kb-tools-dialog-close" id="kb-tools-dialog-close" aria-label="Close tools picker"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13 11.8l6.1-6.3-1-1-6.1 6.2-6.1-6.2-1 1 6.1 6.3-6.5 6.7 1 1 6.5-6.6 6.5 6.6 1-1z"/></svg><span>Close</span></button>
+	</div>
+	<div class="kb-dialog-body kb-tools-dialog-body">
+		<section class="kb-picker-group">
+			<h3 class="kb-picker-group-label">Compress</h3>
+			<div class="kb-picker-grid is-three">
+				<a class="kb-picker-card" href="/tools/compress-image/">
+					<span class="kb-picker-card-top">
+						<span class="kb-picker-card-title">Compress Image</span>
+						<span class="kb-picker-card-meta">
+							<span class="kb-picker-badge">Any</span>
+							<span class="kb-picker-arrow"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13.5 6l-1.1 1.1 4.1 4.1H4v1.5h12.5l-4.1 4.1 1.1 1.1 6-6-6-6z"/></svg></span>
+						</span>
+					</span>
+					<span class="kb-picker-card-desc">Optimize JPEG, PNG, WebP, AVIF, GIF, or BMP locally with live before/after inspection.</span>
+				</a>
+				<a class="kb-picker-card" href="/tools/compress-jpeg/">
+					<span class="kb-picker-card-top">
+						<span class="kb-picker-card-title">Compress JPEG</span>
+						<span class="kb-picker-card-meta">
+							<span class="kb-picker-badge">JPEG</span>
+							<span class="kb-picker-arrow"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13.5 6l-1.1 1.1 4.1 4.1H4v1.5h12.5l-4.1 4.1 1.1 1.1 6-6-6-6z"/></svg></span>
+						</span>
+					</span>
+					<span class="kb-picker-card-desc">Optimize JPG and JPEG photographs with live quality control and side-by-side detail check.</span>
+				</a>
+				<a class="kb-picker-card" href="/tools/compress-png/">
+					<span class="kb-picker-card-top">
+						<span class="kb-picker-card-title">Compress PNG</span>
+						<span class="kb-picker-card-meta">
+							<span class="kb-picker-badge">PNG</span>
+							<span class="kb-picker-arrow"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13.5 6l-1.1 1.1 4.1 4.1H4v1.5h12.5l-4.1 4.1 1.1 1.1 6-6-6-6z"/></svg></span>
+						</span>
+					</span>
+					<span class="kb-picker-card-desc">Shrink PNG screenshots, logos, and transparent graphics via palette quantization or lossless OxiPNG.</span>
+				</a>
+			</div>
+		</section>
+		<section class="kb-picker-group">
+			<h3 class="kb-picker-group-label">Convert format</h3>
+			<div class="kb-picker-grid">
+				<a class="kb-picker-card" href="/tools/jpg-to-webp/">
+					<span class="kb-picker-card-top">
+						<span class="kb-picker-card-title">JPG to WebP</span>
+						<span class="kb-picker-card-meta">
+							<span class="kb-picker-badge">WebP</span>
+							<span class="kb-picker-arrow"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13.5 6l-1.1 1.1 4.1 4.1H4v1.5h12.5l-4.1 4.1 1.1 1.1 6-6-6-6z"/></svg></span>
+						</span>
+					</span>
+					<span class="kb-picker-card-desc">Convert JPEG photographs into lightweight WebP copies with real measured savings.</span>
+				</a>
+				<a class="kb-picker-card" href="/tools/png-to-webp/">
+					<span class="kb-picker-card-top">
+						<span class="kb-picker-card-title">PNG to WebP</span>
+						<span class="kb-picker-card-meta">
+							<span class="kb-picker-badge">WebP</span>
+							<span class="kb-picker-arrow"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13.5 6l-1.1 1.1 4.1 4.1H4v1.5h12.5l-4.1 4.1 1.1 1.1 6-6-6-6z"/></svg></span>
+						</span>
+					</span>
+					<span class="kb-picker-card-desc">Convert transparent PNGs and UI screenshots to WebP while preserving crisp alpha edges.</span>
+				</a>
+				<a class="kb-picker-card" href="/tools/jpg-to-avif/">
+					<span class="kb-picker-card-top">
+						<span class="kb-picker-card-title">JPG to AVIF</span>
+						<span class="kb-picker-card-meta">
+							<span class="kb-picker-badge">AVIF</span>
+							<span class="kb-picker-arrow"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13.5 6l-1.1 1.1 4.1 4.1H4v1.5h12.5l-4.1 4.1 1.1 1.1 6-6-6-6z"/></svg></span>
+						</span>
+					</span>
+					<span class="kb-picker-card-desc">Convert JPEG photos to compact AVIF files with native speed and WASM fallback.</span>
+				</a>
+				<a class="kb-picker-card" href="/tools/png-to-avif/">
+					<span class="kb-picker-card-top">
+						<span class="kb-picker-card-title">PNG to AVIF</span>
+						<span class="kb-picker-card-meta">
+							<span class="kb-picker-badge">AVIF</span>
+							<span class="kb-picker-arrow"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13.5 6l-1.1 1.1 4.1 4.1H4v1.5h12.5l-4.1 4.1 1.1 1.1 6-6-6-6z"/></svg></span>
+						</span>
+					</span>
+					<span class="kb-picker-card-desc">Convert transparent PNG graphics and screenshots into ultra-compact AVIF files.</span>
+				</a>
+			</div>
+		</section>
+		<section class="kb-picker-group">
+			<h3 class="kb-picker-group-label">Resize &amp; batch</h3>
+			<div class="kb-picker-grid">
+				<a class="kb-picker-card" href="/tools/resize-image/">
+					<span class="kb-picker-card-top">
+						<span class="kb-picker-card-title">Resize Image</span>
+						<span class="kb-picker-card-meta">
+							<span class="kb-picker-badge">Resize</span>
+							<span class="kb-picker-arrow"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13.5 6l-1.1 1.1 4.1 4.1H4v1.5h12.5l-4.1 4.1 1.1 1.1 6-6-6-6z"/></svg></span>
+						</span>
+					</span>
+					<span class="kb-picker-card-desc">Resize photos to exact width/height or common web sizes with aspect-ratio lock and high-quality scaling.</span>
+				</a>
+				<a class="kb-picker-card" href="/tools/bulk-image-compressor/">
+					<span class="kb-picker-card-top">
+						<span class="kb-picker-card-title">Bulk Image Compressor</span>
+						<span class="kb-picker-card-meta">
+							<span class="kb-picker-badge">ZIP batch</span>
+							<span class="kb-picker-arrow"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13.5 6l-1.1 1.1 4.1 4.1H4v1.5h12.5l-4.1 4.1 1.1 1.1 6-6-6-6z"/></svg></span>
+						</span>
+					</span>
+					<span class="kb-picker-card-desc">Batch compress and convert dozens of photos in parallel with live totals and ZIP export.</span>
+				</a>
+			</div>
+		</section>
+	</div>
+	<div class="kb-dialog-foot">
+		<p class="kb-small kb-dialog-foot-note"><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3L4 6.5v5.1c0 4.9 3.4 9.5 8 10.6 4.6-1.1 8-5.7 8-10.6V6.5L12 3zm6.5 8.6c0 4.1-2.7 7.9-6.5 9-3.8-1.1-6.5-4.9-6.5-9V7.5L12 4.7l6.5 2.8v4.1z"/></svg><span>Files never leave your device.</span></p>
+		<a class="kb-btn kb-btn-secondary" href="/tools/"><span>Browse all 9 tools</span><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13.5 6l-1.1 1.1 4.1 4.1H4v1.5h12.5l-4.1 4.1 1.1 1.1 6-6-6-6z"/></svg></a>
+	</div>
+</dialog>
+	<script src="/dist/home.84c0fb30.js" defer></script>
 </body>
 </html>

@@ -112,6 +112,52 @@ const TRANSPARENT_PIXEL = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAE
 	} );
 	dialog?.addEventListener( 'close', finishDialogClose );
 
+	// 1b. Hero "Not on WordPress?" Tools Picker <dialog> modal (progressively enhances /tools/ link).
+	const toolsTrigger = document.getElementById( 'kb-open-tools-modal' ) as HTMLAnchorElement | null;
+	const toolsDialog = document.getElementById( 'kb-tools-dialog' ) as HTMLDialogElement | null;
+	const toolsDialogClose = document.getElementById( 'kb-tools-dialog-close' ) as HTMLButtonElement | null;
+
+	const finishToolsDialogClose = () => {
+		document.body.style.overflow = '';
+		if ( toolsTrigger && typeof toolsTrigger.focus === 'function' ) {
+			toolsTrigger.focus();
+		}
+	};
+
+	const closeToolsDialog = () => {
+		if ( ! toolsDialog ) {
+			return;
+		}
+		if ( typeof toolsDialog.close === 'function' && toolsDialog.open ) {
+			toolsDialog.close();
+		} else {
+			toolsDialog.removeAttribute( 'open' );
+			finishToolsDialogClose();
+		}
+	};
+
+	toolsTrigger?.addEventListener( 'click', ( e ) => {
+		if ( ! toolsDialog || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey ) {
+			return;
+		}
+		e.preventDefault();
+		document.body.style.overflow = 'hidden';
+		if ( typeof toolsDialog.showModal === 'function' ) {
+			toolsDialog.showModal();
+		} else {
+			toolsDialog.setAttribute( 'open', '' );
+		}
+		toolsDialogClose?.focus();
+	} );
+
+	toolsDialogClose?.addEventListener( 'click', closeToolsDialog );
+	toolsDialog?.addEventListener( 'click', ( e ) => {
+		if ( e.target === toolsDialog ) {
+			closeToolsDialog();
+		}
+	} );
+	toolsDialog?.addEventListener( 'close', finishToolsDialogClose );
+
 	// 2. Developer code tabs (APG roving tabindex + Arrow/Home/End keyboard navigation) + copy button.
 	const tabList = document.querySelector< HTMLElement >( '#kb-code-tabs [role="tablist"]' );
 	const codeTabBtns = Array.from( document.querySelectorAll< HTMLButtonElement >( '[data-code-tab]' ) );

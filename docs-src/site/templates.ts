@@ -615,6 +615,12 @@ add_action(
 					<a class="kb-btn kb-btn-secondary kb-btn-lg" href="${ esc( PLAYGROUND_URL ) }" target="_blank" rel="noopener noreferrer">${ ICONS.external }<span>Try it in a demo site</span></a>
 				</div>
 				<p class="kb-small">The demo site is a real WordPress site that runs in your browser, with Kilobyte and 3 sample images already set up.</p>
+				<div class="kb-hero-alt">
+					<a class="kb-hero-alt-trigger" href="/tools/" id="kb-open-tools-modal" aria-haspopup="dialog" aria-controls="kb-tools-dialog">
+						<span class="kb-hero-alt-eyebrow">Not on WordPress?</span>
+						<span class="kb-hero-alt-action">Use our free browser image tools ${ ICONS.arrowRight }</span>
+					</a>
+				</div>
 			</div>
 		</div>
 
@@ -859,6 +865,59 @@ ${ renderFooter() }
 	<div class="kb-dialog-body">
 		<img id="kb-dialog-img" class="kb-modal-img" src="${ TRANSPARENT_PIXEL }" width="1" height="1" alt="" />
 		<p class="kb-small" id="kb-dialog-caption"></p>
+	</div>
+</dialog>
+<dialog class="kb-dialog kb-tools-dialog" id="kb-tools-dialog" aria-labelledby="kb-tools-dialog-title" aria-describedby="kb-tools-dialog-desc">
+	<div class="kb-dialog-head kb-tools-dialog-head">
+		<div class="kb-tools-dialog-intro">
+			<p class="kb-kicker">Browser utilities · 100% local</p>
+			<h2 class="kb-tools-dialog-title" id="kb-tools-dialog-title">What would you like to do?</h2>
+			<p class="kb-small" id="kb-tools-dialog-desc">Every tool runs locally in your browser — no uploads, no account, and no file limits.</p>
+		</div>
+		<button type="button" class="kb-btn kb-btn-ghost kb-tools-dialog-close" id="kb-tools-dialog-close" aria-label="Close tools picker">${ ICONS.close }<span>Close</span></button>
+	</div>
+	<div class="kb-dialog-body kb-tools-dialog-body">
+		${ [
+			{
+				label: 'Compress',
+				items: TOOLS.filter( ( t ) => t.category === 'compress' ),
+			},
+			{
+				label: 'Convert format',
+				items: TOOLS.filter( ( t ) => t.category === 'convert' ),
+			},
+			{
+				label: 'Resize & batch',
+				items: TOOLS.filter( ( t ) => t.category === 'resize' || t.category === 'bulk' ),
+			},
+		].map( ( group ) => `<section class="kb-picker-group">
+			<h3 class="kb-picker-group-label">${ esc( group.label ) }</h3>
+			<div class="kb-picker-grid${ group.items.length === 3 ? ' is-three' : '' }">
+				${ group.items.map( ( tool ) => {
+					const badge = tool.slug === 'compress-image'
+						? 'Any'
+						: tool.category === 'bulk'
+							? 'ZIP batch'
+							: tool.category === 'resize'
+								? 'Resize'
+								: labelForMime( tool.defaultOutputMime );
+					return `<a class="kb-picker-card" href="/tools/${ esc( tool.slug ) }/">
+					<span class="kb-picker-card-top">
+						<span class="kb-picker-card-title">${ esc( tool.name ) }</span>
+						<span class="kb-picker-card-meta">
+							<span class="kb-picker-badge">${ esc( badge ) }</span>
+							<span class="kb-picker-arrow">${ ICONS.arrowRight }</span>
+						</span>
+					</span>
+					<span class="kb-picker-card-desc">${ esc( tool.cardSummary ) }</span>
+				</a>`;
+				} ).join( '\n\t\t\t\t' ) }
+			</div>
+		</section>` ).join( '\n\t\t' ) }
+	</div>
+	<div class="kb-dialog-foot">
+		<p class="kb-small kb-dialog-foot-note">${ ICONS.shield }<span>Files never leave your device.</span></p>
+		<a class="kb-btn kb-btn-secondary" href="/tools/"><span>Browse all ${ TOOLS.length } tools</span>${ ICONS.arrowRight }</a>
 	</div>
 </dialog>`;
 

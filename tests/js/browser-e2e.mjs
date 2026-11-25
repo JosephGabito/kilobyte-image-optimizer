@@ -222,6 +222,16 @@ try {
 	assert.ok( homeOut && hasMagic( homeOut.head, 'image/webp' ), 'Homepage sample should encode WebP' );
 	await page.screenshot( { path: path.join( outDir, 'v3-home-desktop.png' ) } );
 
+	// Hero Tools Picker modal: opens on click, lists all 9 tools, closes on Escape, restores focus.
+	await page.locator( '#kb-open-tools-modal' ).click();
+	await page.waitForSelector( '#kb-tools-dialog[open]' );
+	assert.equal( await page.locator( '#kb-tools-dialog .kb-picker-card' ).count(), 9, 'Tools Picker modal should list all 9 tools' );
+	await page.screenshot( { path: path.join( outDir, 'v3-home-tools-modal.png' ) } );
+	await page.keyboard.press( 'Escape' );
+	await page.waitForFunction( () => ! document.getElementById( 'kb-tools-dialog' )?.hasAttribute( 'open' ) );
+	const focusedAfterToolsClose = await page.evaluate( () => document.activeElement?.id );
+	assert.equal( focusedAfterToolsClose, 'kb-open-tools-modal', 'Tools modal should restore focus to hero trigger' );
+
 	// Screen dialog focus restore.
 	await page.locator( '#kb-screen-frame' ).click();
 	await page.waitForSelector( '#kb-screen-dialog[open]' );
