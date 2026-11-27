@@ -1,4 +1,4 @@
-=== Kilobyte Image Optimizer ===
+=== Kilobyte Image Optimizer – WebP & AVIF Converter ===
 Contributors: dunhakdis
 Tags: image-optimization, compress-images, optimize-images, webp, avif
 Requires at least: 6.6
@@ -8,7 +8,7 @@ Stable tag: 1.1.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Unlimited free WebP & AVIF optimization in your browser or on site. Keeps original files & links intact, with WordPress Abilities for AI agents.
+Unlimited free WebP & AVIF image optimizer and converter. Compress WordPress images locally in your browser or on site with zero quotas.
 
 == Description ==
 
