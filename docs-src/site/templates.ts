@@ -626,7 +626,7 @@ add_action(
 
 		<div class="kb-container kb-hero-media">
 			<div class="kb-banner">
-				<img src="/assets/banner-1544x500.webp" alt="A Renaissance-style painting of a scholar who holds up a light 507 KB picture next to a heavy 3.81 MB stone slab bound in chains" width="1544" height="500" fetchpriority="high" />
+				<img src="/assets/banner-1544x500.webp" alt="Kilobyte Image Optimizer: unlimited local WebP and AVIF optimization for WordPress, comparing a 2.03 MB JPEG and a 115 KB AVIF" width="1544" height="500" fetchpriority="high" />
 			</div>
 
 			<div class="kb-grid kb-tiles">
