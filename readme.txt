@@ -1,6 +1,6 @@
-=== Kilobyte Image Optimizer – WebP & AVIF Converter ===
+=== Kilobyte – Image Optimization, Compress Images & Optimize Images, AVIF & WebP Converter ===
 Contributors: dunhakdis
-Tags: image-optimization, compress-images, optimize-images, webp, avif
+Tags: compress-images, optimize-images, webp, avif
 Requires at least: 6.6
 Tested up to: 7.1
 Requires PHP: 7.4
@@ -8,45 +8,23 @@ Stable tag: 1.1.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Free WebP & AVIF image optimizer and converter. Compress images locally with no account, API key, or monthly quota. Keep your originals.
+Free image optimizer, WebP converter & AVIF converter. Compress images and optimize images locally for fast image optimization.
 
 == Description ==
 
-**Smaller images. Your originals stay.**
+**Smaller WebP and AVIF images. Your originals stay.**
 
-Kilobyte is a free image optimizer for WordPress. Serve smaller WebP or AVIF copies so visitors download less image data. Your original Media Library files and existing links stay intact.
+Kilobyte is a free image optimizer, WebP converter, and AVIF converter for WordPress. Compress images and optimize images directly in your browser or on your server so visitors load lightweight WebP and AVIF files while your original Media Library files and links stay intact.
 
-**No signup. No API key. No monthly quota.** Processing runs in your browser or on your WordPress site, without an external compression service.
+**No signup. No API key. No monthly quota.** Unlike cloud image optimization services, this free image optimizer converts JPEG, PNG, BMP, and still GIF photos to WebP and AVIF locally—with zero external uploads, no `exec()`, and no `gifsicle`, `jpegtran`, or `optipng`. Try the [interactive WebP and AVIF browser demo](https://kilobyte.gabi.to/).
 
-**Start with one photo.** Open **Media > Optimization**, choose **Preview**, and compare the quality and file size side by side. Adjust the settings, then choose **Optimize now** when you like the result. You can also preview a file from your computer and download the optimized copy.
+= Features =
 
-Want to see it before installing? [Try the interactive browser demo](https://kilobyte.gabi.to/).
-
-= Optimize the images you choose =
-
-* **A few images:** Use **Selective optimize** for the photos in a post, landing page, or gallery.
-* **Your existing library:** **Bulk optimize** works through supported images with progress, estimated time remaining, and per-image results. Continue stopped runs or retry failures.
-* **New uploads:** Create optimized copies automatically after WordPress saves the originals, using your browser or scheduled background processing.
-
-= Choose the quality. Keep the original. =
-
-Compare presets, fine-tune quality, and set maximum dimensions for optimized copies. Find the balance that looks right on your own photos.
-
-Supported WordPress images use optimized copies with the original as fallback. Use **Restore** or **Restore all** to switch back to available originals. Keeping both versions uses additional storage.
-
-= Work inside WordPress =
-
-Built with native WordPress components, with no setup wizard and no upgrade banners. Use familiar WordPress controls to manage images, regenerate thumbnails, and copy an optimization summary. Optional settings fill empty alt text from filenames and add browser image-decoding hints.
-
-= Give your AI assistant image tools =
-
-On WordPress 6.9+, connect your assistant through [Uncanny Automator MCP](https://wordpress.org/plugins/uncanny-automator/) or another integration that supports the [WordPress Abilities API](https://developer.wordpress.org/apis/abilities-api/).
-
-Your assistant can check savings, find queued images, read or update preferences, optimize or restore individual images, and regenerate thumbnails.
-
-For example, ask: **"Show me my image optimization stats"** or **"Optimize this image and show me the result."**
-
-Kilobyte performs the compression on your WordPress server and checks the connected user's permissions. AI and MCP services may have separate accounts or usage limits.
+* **Visual Preview:** Compare original photos against WebP and AVIF quality and file size side by side before saving, or preview any local image from your computer.
+* **Selective & Bulk Image Optimization:** Compress images for a single post, or bulk optimize images across your Media Library to WebP and AVIF with progress, ETA, and retry controls.
+* **Automatic Upload Conversion:** Run WebP converter and AVIF converter jobs automatically on new uploads in your browser or via WordPress background tasks.
+* **Native WordPress UI & Safe Restore:** Built with native WordPress components—no setup wizard, no upgrade banners, animated GIF/WebP/AVIF protection, and 1-click **Restore** or **Restore all**.
+* **WordPress Power Tools:** Resize dimensions, regenerate thumbnails, auto-fill empty alt text, WP-CLI commands, Multisite support, and WordPress 6.9+ [Abilities API](https://developer.wordpress.org/apis/abilities-api/) for AI assistants and MCP.
 
 == Installation ==
 
@@ -119,6 +97,21 @@ New pages use original Media Library files. Preferences and scheduled work are r
 
 For cleanup on a single-site install, use **Restore all** and keep Kilobyte active while scheduled tasks remove eligible copies. Pending cleanup resumes after reinstalling and verifying file references. Very large libraries may defer cleanup and recheck daily.
 
+= Can I connect an AI assistant or MCP server? =
+
+Yes. On WordPress 6.9+, connect your assistant through [Uncanny Automator MCP](https://wordpress.org/plugins/uncanny-automator/) or another integration that supports the [WordPress Abilities API](https://developer.wordpress.org/apis/abilities-api/).
+
+Your assistant can check savings, find queued images, read or update preferences, optimize or restore individual images, and regenerate thumbnails—for example: *"Show me my image optimization stats"* or *"Optimize this image and show me the result."* Kilobyte runs compression on your WordPress server and checks the connected user's permissions. AI and MCP services may have separate accounts or usage limits.
+
+= What developer tools (WP-CLI, Abilities, hooks, source) are included? =
+
+Source code and issue tracking live on [GitHub](https://github.com/JosephGabito/kilobyte-image-optimizer).
+
+* **WP-CLI:** `wp kilobyte optimize` defaults to 100 images per run (`--limit` to change), plus `wp kilobyte restore`, `wp kilobyte stats` (`--reconcile` optional), and `wp kilobyte purge-backups`.
+* **WordPress Abilities:** `kilobyte/get-stats`, `kilobyte/get-queue`, `kilobyte/get-settings`, `kilobyte/update-settings`, `kilobyte/optimize-image`, `kilobyte/restore-image`, and `kilobyte/regenerate-thumbnails`. Abilities define JSON schemas and permission checks and operate on one attachment at a time.
+* **Hooks:** `kilobyte_io_settings`, `kilobyte_io_should_optimize`, `kilobyte_io_after_optimize`, `kilobyte_io_variant_filename`, and `kilobyte_io_variant_changed` (passes the attachment ID for cache integrations).
+* **Build from source:** Build the JavaScript and TypeScript in `src-js/` with Node.js 24.15+ (24.x). Run `npm ci` and `npm run build` in the plugin directory; compiled scripts and dependency manifests are written to `build/`.
+
 == Screenshots ==
 
 1. Preview: compare your original and optimized image, check file sizes, and choose Optimize now.
@@ -126,18 +119,6 @@ For cleanup on a single-site install, use **Restore all** and keep Kilobyte acti
 3. Bulk optimize: progress, results, estimated transfer savings, copyable summary, thumbnails, and Restore all.
 4. Preference: format, quality, dimensions, filename-based alt text, and decoding hints.
 5. Attachment details: original file, optimization savings, and Restore original.
-
-== Development ==
-
-Source code and issue tracking: [GitHub](https://github.com/JosephGabito/kilobyte-image-optimizer).
-
-**WP-CLI:** `wp kilobyte optimize` defaults to 100 images per run (`--limit` to change), plus `wp kilobyte restore`, `wp kilobyte stats` (`--reconcile` optional), and `wp kilobyte purge-backups`.
-
-**WordPress Abilities:** `kilobyte/get-stats`, `kilobyte/get-queue`, `kilobyte/get-settings`, `kilobyte/update-settings`, `kilobyte/optimize-image`, `kilobyte/restore-image`, and `kilobyte/regenerate-thumbnails`. Abilities define JSON schemas and permission checks. Image actions operate on one attachment at a time.
-
-**Hooks:** `kilobyte_io_settings`, `kilobyte_io_should_optimize`, `kilobyte_io_after_optimize`, `kilobyte_io_variant_filename`, and `kilobyte_io_variant_changed`. The last passes the attachment ID for cache integrations.
-
-Build the JavaScript and TypeScript in `src-js/` with Node.js 24.15+ (24.x). Run `npm ci` and `npm run build` in the plugin directory; scripts and dependency manifests go to `build/`.
 
 == Changelog ==
 
